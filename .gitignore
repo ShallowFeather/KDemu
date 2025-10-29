@@ -1,19 +1,20 @@
-﻿################################################################################
+################################################################################
 # 這個 .gitignore 檔案由 Microsoft(R) Visual Studio 自動建立。
 ################################################################################
 
-/.vs/KDemu/v17/Browse.VC.db
-/.vs/KDemu/v17/Browse.VC.db-shm
-/.vs/KDemu/v17/Browse.VC.db-wal
-/.vs/KDemu/v17/Browse.VC.opendb
-*.json
+# Visual Studio specific
+/.vs/
+*.suo
+*.user
 *.wsuo
 *.vsidx
-/vcpkg_installed/x64-windows-static/x64-windows-static/lib/pkgconfig
-/vcpkg_installed/x64-windows-static/x64-windows-static/include/unicorn
-/vcpkg_installed/x64-windows-static/x64-windows-static/lib
-/vcpkg_installed/x64-windows-static/x64-windows-static
-/.vs/KDemu/v17
-/KDemu/x64/Debug
-/vcpkg_installed/x64-windows-static
-/x64/Debug
+*.vcxproj.user
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+ARM64/
+
+# Dependencies
+/vcpkg_installed/
