@@ -9,3 +9,11 @@
 *.json
 *.wsuo
 *.vsidx
+/vcpkg_installed/x64-windows-static/x64-windows-static/lib/pkgconfig
+/vcpkg_installed/x64-windows-static/x64-windows-static/include/unicorn
+/vcpkg_installed/x64-windows-static/x64-windows-static/lib
+/vcpkg_installed/x64-windows-static/x64-windows-static
+/.vs/KDemu/v17
+/KDemu/x64/Debug
+/vcpkg_installed/x64-windows-static
+/x64/Debug
