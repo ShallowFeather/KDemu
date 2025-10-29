@@ -6,6 +6,6 @@
 /.vs/KDemu/v17/Browse.VC.db-shm
 /.vs/KDemu/v17/Browse.VC.db-wal
 /.vs/KDemu/v17/Browse.VC.opendb
-/.vs/KDemu/FileContentIndex/e371c6b3-0664-410c-831e-be2d199bd9aa.vsidx
-/.vs/openKD/v17/.wsuo
-/.vs/openKD/v17/DocumentLayout.json
+*.json
+*.wsuo
+*.vsidx
