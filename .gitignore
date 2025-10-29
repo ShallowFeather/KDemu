@@ -5,3 +5,6 @@
 /.vs/KDemu/v17/DocumentLayout.json
 *.vsidx
 /.vs/KDemu/v17
+/KDemu/x64/Debug
+/vcpkg_installed/x64-windows-static
+/x64/Debug
