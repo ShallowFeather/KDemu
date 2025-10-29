@@ -559,6 +559,18 @@ bool PEloader::LoadPE(const std::string path) {
 		IMAGE_DIRECTORY_ENTRY_EXCEPTION,
 		&peFiles[0]->ExceptionTableSize);
 	peFiles[0]->ExceptionTable = peFiles[0]->Base + ((PUCHAR)ExceptionTable - (PUCHAR)peFiles[0]->memMap);
+
+
+	uint64_t RtlpInvertedFunctionTableList = 0xfffff80508c18088;
+	uint64_t imagebase = 0xfffff80508c18090;
+	uint64_t imagesizebase = 0xfffff80508c18098;
+	uint64_t ExceptionTableSizebase = 0xfffff80508c1809C;
+	Emu(uc)->try_write(RtlpInvertedFunctionTableList, &peFiles[0]->ExceptionTable, sizeof(peFiles[0]->ExceptionTable));
+	Emu(uc)->try_write(imagebase, &Emu_file_Base, sizeof(Emu_file_Base));
+	Emu(uc)->try_write(imagesizebase, &image_size, sizeof(uint32_t));
+	Emu(uc)->try_write(ExceptionTableSizebase, &peFiles[0]->ExceptionTableSize, sizeof(uint32_t));
+
+
 	FixImport(pe->Base, imports);
 	return true;
 }

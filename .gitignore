@@ -1,0 +1,20 @@
+################################################################################
+# 這個 .gitignore 檔案由 Microsoft(R) Visual Studio 自動建立。
+################################################################################
+
+# Visual Studio specific
+/.vs/
+*.suo
+*.user
+*.wsuo
+*.vsidx
+*.vcxproj.user
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+ARM64/
+
+# Dependencies
+/vcpkg_installed/
