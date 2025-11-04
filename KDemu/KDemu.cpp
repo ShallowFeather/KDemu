@@ -9,6 +9,8 @@
 #include <windows.h>
 #include <mutex>
 #include "UnicornEmu.hpp"
+#include "Elevator.h"
+
 void gdbServer(uc_engine* uc, uint64_t entry) {
 	HMODULE hDll = LoadLibrary(TEXT("udbserver.dll"));
 	if (!hDll) {
@@ -180,6 +182,11 @@ void mainThread() {
 }
 
 int main(int argc, char** argv, char** envp) {
+	// Check if the program has all necessary privileges.
+	if (KDemu::Elevator::CanElevate())	{
+		std::cerr << "Please launch the program with administrator rights.";
+		return -1;
+	}
 	PEloader& peLoader = PEloader::GetInstance();
 	peLoader.LoadDmp();
 	InitializeCriticalSection(&peLoader.cs);

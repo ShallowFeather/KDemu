@@ -20,6 +20,7 @@
     <ClCompile Include="KDemu.cpp" />
     <ClCompile Include="Global.cpp" />
     <ClCompile Include="unicorn.cpp" />
+    <ClCompile Include="Elevator.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="NtType.hpp" />
@@ -30,6 +31,9 @@
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="UnicornEmu.hpp">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="Elevator.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
   </ItemGroup>
