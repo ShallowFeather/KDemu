@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Elevator.cpp" />
     <ClCompile Include="Emulate.cpp" />
     <ClCompile Include="Global.cpp" />
     <ClCompile Include="KDemu.cpp" />
@@ -27,6 +28,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cpu.h" />
+    <ClInclude Include="Elevator.h" />
     <ClInclude Include="Emulate.hpp" />
     <ClInclude Include="Global.h" />
     <ClInclude Include="LoadPE.hpp" />
