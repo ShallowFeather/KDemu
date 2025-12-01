@@ -8,74 +8,100 @@
 #include <cstdio>
 #include <cstring>
 
-namespace {
-	std::wstring BuildThreadPrefix(bool showThreadId) {
-		if (!showThreadId) {
-			return L" ";
-		}
+void Logger::Log(bool tid_show, int color, const char* format, ...)
+{
+	// 1. Console handle 建議 static cache（只抓一次）
+	static HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (!hConsole)
+		return;
 
-		wchar_t buffer[64] = {};
-		_snwprintf_s(buffer, _TRUNCATE, L"[tid: %llx]  ", static_cast<unsigned long long>(GetCurrentThreadId()));
-		return buffer;
-	}
+	// 2. 格式化 ANSI 訊息到 stack buffer
+	char sBuffer[2048];
 
-	void WriteWideToConsole(HANDLE console, const std::wstring& text) {
-		if (!console || text.empty()) {
-			return;
-		}
-
-		DWORD consoleMode = 0;
-		if (GetConsoleMode(console, &consoleMode)) {
-			DWORD written = 0;
-			WriteConsoleW(console, text.c_str(), static_cast<DWORD>(text.size()), &written, nullptr);
-		}
-		else {
-			int required = WideCharToMultiByte(GetACP(), 0, text.c_str(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
-			if (required > 0) {
-				std::string narrow(static_cast<size_t>(required), '\0');
-				WideCharToMultiByte(GetACP(), 0, text.c_str(), static_cast<int>(text.size()), narrow.data(), required, nullptr, nullptr);
-				fwrite(narrow.data(), 1, narrow.size(), stdout);
-			}
-		}
-	}
-}
-
-void Logger::Log(bool tid_show, int color, const char* format,  ...) {
-	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-	SetConsoleTextAttribute(hConsole, static_cast<WORD>(color));
-
-	char sBuffer[2048] = { 0 };
 	va_list args;
 	va_start(args, format);
 	_vsnprintf_s(sBuffer, _countof(sBuffer), _TRUNCATE, format, args);
 	va_end(args);
 
-	std::wstring prefix = BuildThreadPrefix(tid_show);
-	std::wstring wideMessage;
+	// 3. 準備寬字元輸出 buffer（含 prefix）
+	wchar_t wBuffer[2048];
+	int pos = 0;
 
-	int required = MultiByteToWideChar(GetACP(), 0, sBuffer, -1, nullptr, 0);
-	if (required > 0) {
-		wideMessage.resize(static_cast<size_t>(required - 1));
-		MultiByteToWideChar(GetACP(), 0, sBuffer, -1, wideMessage.data(), required);
+	if (tid_show)
+	{
+		// prefix：[TID] 這邊直接用 swprintf 到 buffer 前面
+		DWORD tid = GetCurrentThreadId();
+		// 回傳寫入長度（不含結尾 \0）
+		pos = _snwprintf_s(wBuffer, _countof(wBuffer), _TRUNCATE, L"[%u] ", tid);
+		if (pos < 0) pos = 0;
 	}
 
-	WriteWideToConsole(hConsole, prefix + wideMessage);
-	fflush(stdout);
-}
+	// 4. 把 sBuffer 轉成 wide 接在 prefix 後面
+	int remaining = static_cast<int>(_countof(wBuffer) - pos);
+	if (remaining <= 0)
+		return;
 
-void Logger::Log(bool tid_show, int color, const wchar_t* format, ...) {
-	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+	int wlen = MultiByteToWideChar(
+		GetACP(),          // 或 CP_UTF8，看你實際 encoding
+		0,
+		sBuffer,
+		-1,
+		wBuffer + pos,
+		remaining
+	);
+
+	if (wlen <= 0)
+		return;
+
+	// 5. 設定顏色（如果顏色很多變，可以考慮先 cache 目前顏色再還原）
 	SetConsoleTextAttribute(hConsole, static_cast<WORD>(color));
 
-	wchar_t wBuffer[2048] = { 0 };
+	// 6. 直接寫寬字元到 console，不用 std::wstring / + 拼接
+	DWORD written = 0;
+	WriteConsoleW(hConsole, wBuffer, pos + wlen - 1, &written, nullptr);
+	// -1 是因為 MultiByteToWideChar 包含結尾 \0
+
+	// 不再 fflush(stdout); WriteConsoleW 本來就直接到 console，
+	// 而且 stdout 與 console handle 不是同一套 buffer。
+}
+
+
+void Logger::Log(bool tid_show, int color, const wchar_t* format, ...)
+{
+	// 1. Console handle 建議 cache 起來，避免每次 GetStdHandle
+	static HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (!hConsole)
+		return;
+
+	// 2. 準備輸出 buffer
+	wchar_t buffer[2048];
+
+	int pos = 0;
+	if (tid_show)
+	{
+		// 這裡假設 prefix 格式像 [T1234] 之類
+		DWORD tid = GetCurrentThreadId();
+		pos = _snwprintf_s(buffer, _countof(buffer), _TRUNCATE, L"[%u] ", tid);
+		if (pos < 0) pos = 0;
+	}
+
+	// 3. 在 prefix 後面接上真正的 log 訊息
 	va_list args;
 	va_start(args, format);
-	_vsnwprintf_s(wBuffer, _countof(wBuffer), _TRUNCATE, format, args);
+	_vsnwprintf_s(buffer + pos,
+		_countof(buffer) - pos,
+		_TRUNCATE,
+		format,
+		args);
 	va_end(args);
 
-	std::wstring prefix = BuildThreadPrefix(tid_show);
-	WriteWideToConsole(hConsole, prefix + wBuffer);
-	fflush(stdout);
+	// 4. 設定顏色（如果顏色很常變，可以再做快取判斷）
+	SetConsoleTextAttribute(hConsole, static_cast<WORD>(color));
+
+	// 5. 直接寫出去，不用 std::wstring / 不用 fflush
+	DWORD written = 0;
+	size_t len = wcslen(buffer);
+	WriteConsoleW(hConsole, buffer, static_cast<DWORD>(len), &written, nullptr);
 }
 
 void fasttest() {

@@ -505,19 +505,32 @@ public:
 	}
 
 	uint64_t HeapAlloc(uint64_t size) {
-		return HeapAlloc(size, true);
+		return HeapAlloc(size, true,NULL);
 	}
 
-	uint64_t HeapAlloc(uint64_t size, bool show) {
+	uint64_t HeapAlloc(uint64_t size, bool show, void* user_data) {
+		ThreadInfo_t* obj;
 		PEloader* loader = &PEloader::GetInstance();
-		DWORD tid = GetCurrentThreadId();
-		for (auto& ti : loader->Threads) {
-			if (ti->threadId != tid) {
-				ResetEvent(ti->Event);
+		if (user_data != nullptr) {
+			obj = reinterpret_cast<ThreadInfo_t*>(user_data);
+
+			for (auto& ti : loader->Threads) {
+
+				if (ti->threadId != obj->threadId) {
+					ResetEvent(ti->Event);
+				}
 			}
-			else if (ti->threadId == tid) {
-				loader->errorevent = ti->Event;
-				Sleep(1);
+			if (loader->errorevent != nullptr)
+			{
+				if (loader->errorevent != obj->Event)
+				{
+					WaitForSingleObject(loader->errorevent, INFINITE);
+				}
+				loader->errorevent = obj->Event;
+			}
+			else
+			{
+				loader->errorevent = obj->Event;
 			}
 		}
 
@@ -545,7 +558,8 @@ public:
 			}
 			for (int i = start; i < static_cast<int>(count) - 1; i++) {
 				if (region[i + 1].begin - region[i].end >= allocSize) {
-					alloc_addr = PAGE_ALIGN(region[i].end);
+					uint64_t temp = region[i].end;
+					alloc_addr = PAGE_ALIGN(temp);
 					found_gap = true;
 					break;
 				}
@@ -555,7 +569,7 @@ public:
 		if (!found_gap) {
 			alloc_addr = loader->lastAlloc;
 		}
-
+		
 		if (allocSize == 0) {
 			for (auto& ti : loader->Threads) {
 				SetEvent(ti->Event);
@@ -566,7 +580,6 @@ public:
 			}
 			return 0;
 		}
-
 		Logger::Log(true, ConsoleColor::DARK_YELLOW, "Memory address: %llx size: %llx\n", alloc_addr, static_cast<uint64_t>(allocSize));
 		bool success = false;
 		void* real_addr = _aligned_malloc(allocSize, 0x1000);

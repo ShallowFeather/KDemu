@@ -62,7 +62,7 @@ void PEloader::MapAllDriversFromKdmp() {
 	auto to_lower = [](std::string s) {
 		for (auto& c : s) c = static_cast<char>(::tolower(static_cast<unsigned char>(c)));
 		return s;
-	};
+		};
 
 	auto basename_no_ext = [&](const std::string& path) {
 		size_t pos = path.find_last_of("/\\");
@@ -70,7 +70,7 @@ void PEloader::MapAllDriversFromKdmp() {
 		size_t dot = fname.find_last_of('.');
 		if (dot != std::string::npos) fname = fname.substr(0, dot);
 		return to_lower(fname);
-	};
+		};
 
 	std::vector<std::string> processed_names;
 	processed_names.reserve(peFiles.size());
@@ -115,7 +115,7 @@ void PEloader::MapAllDriversFromKdmp() {
 			rem -= n;
 		}
 		return true;
-	};
+		};
 
 	constexpr size_t kMaxModules = 4096;
 	size_t mod_count = 0;
@@ -217,210 +217,210 @@ void PEloader::MapAllDriversFromKdmp() {
 
 /*
 void PEloader::MapAllDriversFromKdmp() {
-    auto emu = Emu(uc);
+	auto emu = Emu(uc);
 
-    auto to_lower = [](std::string s) {
-        for (auto &c : s) c = static_cast<char>(::tolower(static_cast<unsigned char>(c)));
-        return s;
-    };
-    auto basename_no_ext = [&](const std::string &path) {
-        size_t pos = path.find_last_of("/\\");
-        std::string fname = (pos == std::string::npos) ? path : path.substr(pos + 1);
-        size_t dot = fname.find_last_of('.');
-        if (dot != std::string::npos) fname = fname.substr(0, dot);
-        return to_lower(fname);
-    };
-    std::vector<std::string> processed_names;
-    processed_names.reserve(peFiles.size());
-    for (auto *pf : peFiles) {
-        if (!pf) continue;
-        processed_names.emplace_back(basename_no_ext(pf->FileName));
-    }
+	auto to_lower = [](std::string s) {
+		for (auto &c : s) c = static_cast<char>(::tolower(static_cast<unsigned char>(c)));
+		return s;
+	};
+	auto basename_no_ext = [&](const std::string &path) {
+		size_t pos = path.find_last_of("/\\");
+		std::string fname = (pos == std::string::npos) ? path : path.substr(pos + 1);
+		size_t dot = fname.find_last_of('.');
+		if (dot != std::string::npos) fname = fname.substr(0, dot);
+		return to_lower(fname);
+	};
+	std::vector<std::string> processed_names;
+	processed_names.reserve(peFiles.size());
+	for (auto *pf : peFiles) {
+		if (!pf) continue;
+		processed_names.emplace_back(basename_no_ext(pf->FileName));
+	}
 
-    int ntIndex = -1;
-    for (size_t i = 0; i < peFiles.size(); ++i) {
-        if (peFiles[i] && peFiles[i]->FileName == "ntoskrnl.exe") {
-            ntIndex = static_cast<int>(i);
-            break;
-        }
-    }
-    if (ntIndex < 0) {
+	int ntIndex = -1;
+	for (size_t i = 0; i < peFiles.size(); ++i) {
+		if (peFiles[i] && peFiles[i]->FileName == "ntoskrnl.exe") {
+			ntIndex = static_cast<int>(i);
+			break;
+		}
+	}
+	if (ntIndex < 0) {
 		Logger::Log(true, ConsoleColor::RED, "[KDMP] Failed to find ntoskrnl.exe PE metadata; unable to locate PsLoadedModuleList.\n");
-        return;
-    }
+		return;
+	}
 
-    uint64_t psListRva = 0;
-    {
-        auto it = peFiles[ntIndex]->FuncAddr.find("PsLoadedModuleList");
-        if (it != peFiles[ntIndex]->FuncAddr.end())
-            psListRva = it->second;
-    }
+	uint64_t psListRva = 0;
+	{
+		auto it = peFiles[ntIndex]->FuncAddr.find("PsLoadedModuleList");
+		if (it != peFiles[ntIndex]->FuncAddr.end())
+			psListRva = it->second;
+	}
 	if (psListRva == 0) {
 		Logger::Log(true, ConsoleColor::RED, "[KDMP] PsLoadedModuleList symbol not found (RVA=0).\n");
-        return;
-    }
+		return;
+	}
 
-    uint64_t ntCandidates[3] = { 0, 0, 0 };
-    int candCount = 0;
-    if (peFiles[ntIndex]->Base) ntCandidates[candCount++] = peFiles[ntIndex]->Base;
-    if (NtoskrnlBase) ntCandidates[candCount++] = NtoskrnlBase;
-    auto itLive = AllDriverBaseAddr.find("ntoskrnl.exe");
-    if (itLive != AllDriverBaseAddr.end()) ntCandidates[candCount++] = itLive->second;
+	uint64_t ntCandidates[3] = { 0, 0, 0 };
+	int candCount = 0;
+	if (peFiles[ntIndex]->Base) ntCandidates[candCount++] = peFiles[ntIndex]->Base;
+	if (NtoskrnlBase) ntCandidates[candCount++] = NtoskrnlBase;
+	auto itLive = AllDriverBaseAddr.find("ntoskrnl.exe");
+	if (itLive != AllDriverBaseAddr.end()) ntCandidates[candCount++] = itLive->second;
 
-    auto read_kdmp = [this](uint64_t addr, void* out, size_t sz) -> bool {
-        uint8_t* dst = reinterpret_cast<uint8_t*>(out);
-        size_t rem = sz;
-        while (rem > 0) {
-            uint64_t page_base = addr & ~0xfffull;
-            const uint8_t* page = kdmp.GetVirtualPage(page_base);
-            if (!page) return false;
-            size_t off = static_cast<size_t>(addr & 0xfff);
-            size_t avail = 0x1000ull - off;
-            size_t n = (rem < avail) ? rem : avail;
-            const uint8_t* src = page + off;
-            for (size_t i = 0; i < n; ++i) dst[i] = src[i];
-            dst += n;
-            addr += n;
-            rem -= n;
-        }
-        return true;
-    };
+	auto read_kdmp = [this](uint64_t addr, void* out, size_t sz) -> bool {
+		uint8_t* dst = reinterpret_cast<uint8_t*>(out);
+		size_t rem = sz;
+		while (rem > 0) {
+			uint64_t page_base = addr & ~0xfffull;
+			const uint8_t* page = kdmp.GetVirtualPage(page_base);
+			if (!page) return false;
+			size_t off = static_cast<size_t>(addr & 0xfff);
+			size_t avail = 0x1000ull - off;
+			size_t n = (rem < avail) ? rem : avail;
+			const uint8_t* src = page + off;
+			for (size_t i = 0; i < n; ++i) dst[i] = src[i];
+			dst += n;
+			addr += n;
+			rem -= n;
+		}
+		return true;
+	};
 
-    LIST_ENTRY listHead{};
-    uint64_t psListHeadAddr = 0;
-    bool headOk = false;
-    for (int i = 0; i < candCount; ++i) {
-        uint64_t base = ntCandidates[i];
-        if (!base) continue;
-        uint64_t addr = base + psListRva;
-        if (read_kdmp(addr, &listHead, sizeof(listHead))) {
-            psListHeadAddr = addr;
-            headOk = true;
+	LIST_ENTRY listHead{};
+	uint64_t psListHeadAddr = 0;
+	bool headOk = false;
+	for (int i = 0; i < candCount; ++i) {
+		uint64_t base = ntCandidates[i];
+		if (!base) continue;
+		uint64_t addr = base + psListRva;
+		if (read_kdmp(addr, &listHead, sizeof(listHead))) {
+			psListHeadAddr = addr;
+			headOk = true;
 			Logger::Log(true, ConsoleColor::DARK_GREEN, "[KDMP] PsLoadedModuleList OK, nt base=0x%llx -> head=0x%llx.\n", base, addr);
-            break;
-        } else {
+			break;
+		} else {
 			Logger::Log(true, ConsoleColor::YELLOW, "[KDMP] Attempt with nt base=0x%llx failed (addr=0x%llx).\n", base, addr);
-        }
-    }
-    if (!headOk) {
+		}
+	}
+	if (!headOk) {
 		Logger::Log(true, ConsoleColor::RED, "[KDMP] Reading PsLoadedModuleList failed; all candidate bases were invalid.\n");
-        return;
-    }
+		return;
+	}
 
-    uint64_t current = reinterpret_cast<uint64_t>(listHead.Flink);
-    const uint64_t listHeadVA = psListHeadAddr;
-    const int kMaxModules = 4096;
-    int mod_count = 0;
+	uint64_t current = reinterpret_cast<uint64_t>(listHead.Flink);
+	const uint64_t listHeadVA = psListHeadAddr;
+	const int kMaxModules = 4096;
+	int mod_count = 0;
 
-    while (current && current != listHeadVA && mod_count < kMaxModules) {
-        _LDR_DATA_TABLE_ENTRY ldr{};
-        if (!read_kdmp(current, &ldr, sizeof(ldr))) {
+	while (current && current != listHeadVA && mod_count < kMaxModules) {
+		_LDR_DATA_TABLE_ENTRY ldr{};
+		if (!read_kdmp(current, &ldr, sizeof(ldr))) {
 			Logger::Log(true, ConsoleColor::YELLOW, "[KDMP] Failed to read LDR_DATA_TABLE_ENTRY (addr=0x%llx).\n", current);
-            break;
-        }
+			break;
+		}
 
-        const uint64_t imageBase = reinterpret_cast<uint64_t>(ldr.DllBase);
-        const uint64_t imageSize = static_cast<uint64_t>(ldr.SizeOfImage);
+		const uint64_t imageBase = reinterpret_cast<uint64_t>(ldr.DllBase);
+		const uint64_t imageSize = static_cast<uint64_t>(ldr.SizeOfImage);
 
-        std::wstring wname;
-        if (ldr.BaseDllName.Length && ldr.BaseDllName.Buffer) {
-            uint16_t len = ldr.BaseDllName.Length;
-            std::vector<wchar_t> buf((len / sizeof(wchar_t)) + 1, L'\0');
-            read_kdmp(reinterpret_cast<uint64_t>(ldr.BaseDllName.Buffer), buf.data(), len);
-            wname.assign(buf.data(), buf.data() + (len / sizeof(wchar_t)));
-        } else {
-            wname = L"(unknown)";
-        }
-        std::string name;
-        UnicodeToANSI(wname, name);
+		std::wstring wname;
+		if (ldr.BaseDllName.Length && ldr.BaseDllName.Buffer) {
+			uint16_t len = ldr.BaseDllName.Length;
+			std::vector<wchar_t> buf((len / sizeof(wchar_t)) + 1, L'\0');
+			read_kdmp(reinterpret_cast<uint64_t>(ldr.BaseDllName.Buffer), buf.data(), len);
+			wname.assign(buf.data(), buf.data() + (len / sizeof(wchar_t)));
+		} else {
+			wname = L"(unknown)";
+		}
+		std::string name;
+		UnicodeToANSI(wname, name);
 
-        if (imageBase && imageSize) {
-            const uint64_t alignedStart = imageBase & ~0xfffull;
-            const uint64_t alignedEnd   = (imageBase + imageSize + 0xfff) & ~0xfffull;
-            const uint64_t alignedSize  = alignedEnd - alignedStart;
-            std::string baseNameNoExt = basename_no_ext(name);
-            bool skip_by_name = false;
-            for (const auto &pn : processed_names) {
-                if (pn == baseNameNoExt || pn.find(baseNameNoExt) != std::string::npos || baseNameNoExt.find(pn) != std::string::npos) {
-                    skip_by_name = true;
-                    break;
-                }
-            }
+		if (imageBase && imageSize) {
+			const uint64_t alignedStart = imageBase & ~0xfffull;
+			const uint64_t alignedEnd   = (imageBase + imageSize + 0xfff) & ~0xfffull;
+			const uint64_t alignedSize  = alignedEnd - alignedStart;
+			std::string baseNameNoExt = basename_no_ext(name);
+			bool skip_by_name = false;
+			for (const auto &pn : processed_names) {
+				if (pn == baseNameNoExt || pn.find(baseNameNoExt) != std::string::npos || baseNameNoExt.find(pn) != std::string::npos) {
+					skip_by_name = true;
+					break;
+				}
+			}
 
-            bool skip_by_range = false;
-            uint64_t imgStart = imageBase;
-            uint64_t imgEnd = imageBase + imageSize - 1;
-            for (auto *pf : peFiles) {
-                if (!pf) continue;
-                uint64_t peStart = pf->Base;
-                uint64_t peEnd = pf->End;
+			bool skip_by_range = false;
+			uint64_t imgStart = imageBase;
+			uint64_t imgEnd = imageBase + imageSize - 1;
+			for (auto *pf : peFiles) {
+				if (!pf) continue;
+				uint64_t peStart = pf->Base;
+				uint64_t peEnd = pf->End;
 				if (imgStart <= peEnd && imgEnd >= peStart) {
-                    skip_by_range = true;
-                    break;
-                }
-            }
+					skip_by_range = true;
+					break;
+				}
+			}
 
-            if (skip_by_name || skip_by_range) {
-                Logger::Log(true, ConsoleColor::YELLOW,
+			if (skip_by_name || skip_by_range) {
+				Logger::Log(true, ConsoleColor::YELLOW,
 					"[KDMP] Skip previously processed module: %s Base=0x%llx Size=0x%llx (by %s)\n",
-                    name.c_str(), imageBase, imageSize,
-                    skip_by_name ? "name" : "range");
-                current = reinterpret_cast<uint64_t>(ldr.InLoadOrderLinks.Flink);
-                continue;
-            }
+					name.c_str(), imageBase, imageSize,
+					skip_by_name ? "name" : "range");
+				current = reinterpret_cast<uint64_t>(ldr.InLoadOrderLinks.Flink);
+				continue;
+			}
 
-            void* host_buf = _aligned_malloc(static_cast<size_t>(alignedSize), 0x1000);
-            if (!host_buf) {
+			void* host_buf = _aligned_malloc(static_cast<size_t>(alignedSize), 0x1000);
+			if (!host_buf) {
 				Logger::Log(true, ConsoleColor::RED, "[KDMP] Buffer allocation failed: %s Base=0x%llx Size=0x%llx\n", name.c_str(), imageBase, imageSize);
-            } else {
-                uint8_t* p = reinterpret_cast<uint8_t*>(host_buf);
-                for (uint64_t i = 0; i < alignedSize; ++i) p[i] = 0;
+			} else {
+				uint8_t* p = reinterpret_cast<uint8_t*>(host_buf);
+				for (uint64_t i = 0; i < alignedSize; ++i) p[i] = 0;
 
-                uint64_t filled = 0;
-                for (uint64_t addr = alignedStart; addr < alignedEnd; addr += 0x1000) {
-                    const uint8_t* page = kdmp.GetVirtualPage(addr);
-                    if (!page) continue;
-                    uint64_t off = addr - alignedStart;
-                    for (size_t i = 0; i < 0x1000; ++i) p[off + i] = page[i];
-                    filled += 0x1000;
-                }
+				uint64_t filled = 0;
+				for (uint64_t addr = alignedStart; addr < alignedEnd; addr += 0x1000) {
+					const uint8_t* page = kdmp.GetVirtualPage(addr);
+					if (!page) continue;
+					uint64_t off = addr - alignedStart;
+					for (size_t i = 0; i < 0x1000; ++i) p[off + i] = page[i];
+					filled += 0x1000;
+				}
 
-                bool already_mapped = false;
-                uint8_t probe = 0;
-                if (emu->try_read(alignedStart, &probe, sizeof(probe))) {
-                    already_mapped = true;
-                }
+				bool already_mapped = false;
+				uint8_t probe = 0;
+				if (emu->try_read(alignedStart, &probe, sizeof(probe))) {
+					already_mapped = true;
+				}
 
-                if (!already_mapped) {
-                    uc_err err = emu->mem_map_ptr(alignedStart, static_cast<size_t>(alignedSize), UC_PROT_ALL, host_buf);
-                    if (err != UC_ERR_OK) {
+				if (!already_mapped) {
+					uc_err err = emu->mem_map_ptr(alignedStart, static_cast<size_t>(alignedSize), UC_PROT_ALL, host_buf);
+					if (err != UC_ERR_OK) {
 						Logger::Log(true, ConsoleColor::RED, "[KDMP] uc_mem_map_ptr failed: %s err=%d Base=0x%llx Size=0x%llx\n",
-                            name.c_str(), err, alignedStart, alignedSize);
-                        _aligned_free(host_buf);
-                    } else {
-                        real_mem_map[alignedStart] = { host_buf, alignedSize };
-                        real_mem_map_type_all[alignedStart] = { host_buf, MUC_PROT_ALL };
+							name.c_str(), err, alignedStart, alignedSize);
+						_aligned_free(host_buf);
+					} else {
+						real_mem_map[alignedStart] = { host_buf, alignedSize };
+						real_mem_map_type_all[alignedStart] = { host_buf, MUC_PROT_ALL };
 
-                        Logger::Log(true, ConsoleColor::DARK_GREEN,
+						Logger::Log(true, ConsoleColor::DARK_GREEN,
 							"[KDMP] Mapped driver: %s Base=0x%llx Size=0x%llx (filled: %llu KB, buffered mapping)\n",
 							name.c_str(), imageBase, imageSize, filled / 1024);
-                        ++mod_count;
-                    }
-                } else {
-                    _aligned_free(host_buf);
-                    Logger::Log(true, ConsoleColor::YELLOW,
+						++mod_count;
+					}
+				} else {
+					_aligned_free(host_buf);
+					Logger::Log(true, ConsoleColor::YELLOW,
 						"[KDMP] Skip already mapped module: %s Base=0x%llx Size=0x%llx (no overwrite)\n",
-                        name.c_str(), imageBase, imageSize);
-                }
-            }
-        }
+						name.c_str(), imageBase, imageSize);
+				}
+			}
+		}
 
-        current = reinterpret_cast<uint64_t>(ldr.InLoadOrderLinks.Flink);
-    }
+		current = reinterpret_cast<uint64_t>(ldr.InLoadOrderLinks.Flink);
+	}
 
-    if (mod_count >= kMaxModules) {
+	if (mod_count >= kMaxModules) {
 		Logger::Log(true, ConsoleColor::YELLOW, "[KDMP] Module count reached limit %d; stopping early.\n", kMaxModules);
-    }
+	}
 	Logger::Log(true, ConsoleColor::GREEN, "[KDMP] Completed driver mapping (buffered batch), total %d.\n", mod_count);
 }*/
 
@@ -456,8 +456,8 @@ void PEloader::InitProcessor() {
 	this->objectList.emplace_back(idtrObj);
 	*/
 
-	auto idtrObj = std::make_shared<Object>("idtr", idtr, 0x1000);
-	this->objectList.emplace_back(idtrObj);
+	/*auto idtrObj = std::make_shared<Object>("idtr", idtr, 0x1000);
+	this->objectList.emplace_back(idtrObj);*/
 
 	emu->idtr(idtr, 0x0FFF);
 	emu->alloc(0x1000, idtr);
@@ -497,7 +497,7 @@ void PEloader::InitProcessor() {
 
 	uint64_t cr0 = 0x80050033;
 	uint64_t cr2 = 0x29c81264717;
-	uint64_t cr3 = 0x1ad000;
+	uint64_t cr3 = 0x6d4000;
 	uint64_t cr4 = 0x3506f8;
 	uint64_t cr8 = 0xf;
 
@@ -509,8 +509,8 @@ void PEloader::InitProcessor() {
 	// MOD_TEST
 	/*Object* cr3Obj = new Object("CR3", cr3, 0x1000);
 	this->objectList.emplace_back(cr3Obj);*/
-	auto cr3Obj = std::make_shared<Object>("CR3", cr3, 0x1000);
-	this->objectList.emplace_back(cr3Obj);
+	/*auto cr3Obj = std::make_shared<Object>("CR3", cr3, 0x1000);
+	this->objectList.emplace_back(cr3Obj);*/
 
 	emu->cr4(cr4);
 	emu->cr8(cr8);
@@ -755,10 +755,10 @@ bool PEloader::LoadPE(const std::string path) {
 	peFiles[0]->ExceptionTable = peFiles[0]->Base + ((PUCHAR)ExceptionTable - (PUCHAR)peFiles[0]->memMap);
 
 
-	uint64_t RtlpInvertedFunctionTableList = g_Debugger->GetSymbol("nt!PsInvertedFunctionTable") + 0x30;//0xfffff80508c18088; //PsInvertedFunctionTable
-	uint64_t imagebase = 0xfffff80508c18090;
-	uint64_t imagesizebase = 0xfffff80508c18098;
-	uint64_t ExceptionTableSizebase = 0xfffff80508c1809C;
+	uint64_t RtlpInvertedFunctionTableList = 0xfffff80508c18088;// g_Debugger->GetSymbol("nt!PsInvertedFunctionTable") + 0x30; <- listhead
+	uint64_t imagebase = 0xfffff80508c18090;//ofset 8
+	uint64_t imagesizebase = 0xfffff80508c18098;// ofset 8
+	uint64_t ExceptionTableSizebase = 0xfffff80508c1809C; //ofset 4
 	Emu(uc)->try_write(RtlpInvertedFunctionTableList, &peFiles[0]->ExceptionTable, sizeof(peFiles[0]->ExceptionTable));
 	Emu(uc)->try_write(imagebase, &Emu_file_Base, sizeof(Emu_file_Base));
 	Emu(uc)->try_write(imagesizebase, &image_size, sizeof(uint32_t));
@@ -770,9 +770,7 @@ bool PEloader::LoadPE(const std::string path) {
 // MOD_TEST
 void PEloader::LoadModule(const std::string path, int type) {
 	auto peBinary = LIEF::PE::Parser::parse(path);
-	if (path == "ntoskrnl.exe") {
-		int i = 0;
-	}
+	auto peSections = peBinary->sections();;
 	if (!peBinary) {
 		char mpath[MAX_PATH];
 		ExpandEnvironmentStringsA("%windir%\\System32\\", mpath, MAX_PATH);
@@ -791,7 +789,7 @@ void PEloader::LoadModule(const std::string path, int type) {
 		}
 	}
 
-	auto peSections = peBinary->sections();;
+
 	PEfile* pe = new PEfile_t();
 
 
@@ -817,6 +815,14 @@ void PEloader::LoadModule(const std::string path, int type) {
 		auto ModuleName = g_Debugger->GetModule("nt");
 		peBinary->optional_header().imagebase(ModuleName->BaseAddress);
 		pe->Base = peBinary->imagebase();
+		for (const auto& section : peSections) {
+
+			if (section.name() == ".data")
+			{
+				Ntoskrnl_data_Base = pe->Base + section.virtual_address();
+				Ntoskrnl_data_End = Ntoskrnl_data_Base + section.virtual_size();
+			}
+		}
 	}
 
 	if (path == "CI.dll")
@@ -841,7 +847,7 @@ void PEloader::LoadModule(const std::string path, int type) {
 		pe->Entry = pe->Base + peBinary->optional_header().addressof_entrypoint();
 		pe->End = pe->Base + peBinary->virtual_size();
 		peFiles.push_back(pe);
-		
+
 
 		for (const auto& section : peSections) {
 			uint64_t sectionAddress = pe->Base + section.virtual_address();
@@ -861,6 +867,15 @@ void PEloader::LoadModule(const std::string path, int type) {
 			if (page != NULL) {
 				Emu(uc)->write(check, kdmp.GetVirtualPage(check), 0x1000);
 			}
+		}
+		if (path == "ntoskrnl.exe") {
+
+			bool KdDebuggerNotPresent = 1;
+			bool KdDebuggerEnabled = 0;
+			uint64_t KdDebuggerNotPresentaddress = pe->Base + pe->FuncAddr["KdDebuggerNotPresent"];
+			uint64_t KdDebuggerEnabledaddress = pe->Base + pe->FuncAddr["KdDebuggerEnabled"];
+			Emu(uc)->write(KdDebuggerNotPresentaddress, &KdDebuggerNotPresent, sizeof(KdDebuggerNotPresent));
+			Emu(uc)->write(KdDebuggerEnabledaddress, &KdDebuggerEnabled, sizeof(KdDebuggerEnabled));
 		}
 
 

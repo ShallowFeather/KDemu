@@ -16,6 +16,17 @@ struct ModuleInfo {
 	std::uint64_t BaseAddress;
 	std::uint64_t Size;
 };
+struct ExportFunctionInfo {
+	std::string Name;
+	uint64_t    Va;
+	ULONG Flags;
+	ULONG TypeId;
+	ULONG NameSize;
+	ULONG Token;
+	ULONG Tag;
+	ULONG Arg32;
+	ULONG Reserved;
+};
 
 class Debugger_t {
 public:
@@ -51,6 +62,14 @@ public:
 	const ModuleInfo* GetModuleByFileName(std::string_view fileName);
 
 	uint64_t GetFunctionVaFromExport(const std::string& fileName, const std::string& funcName);
+
+	std::vector<std::string> GetAllExportFunctionNames(const std::string& fileName);
+
+	std::vector<ExportFunctionInfo> GetAllExportFunctions(const std::string& fileName);
+
+
+	std::vector<ExportFunctionInfo> ListAllFunctionsByDbgEng(const std::string& fileName);
+
 
 private:
 	IDebugClient4* Client_;

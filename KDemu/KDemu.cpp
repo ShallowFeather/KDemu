@@ -66,8 +66,8 @@ void mainThread() {
 
 	if (length > 0 && length < MAX_PATH)
 	{
-		vgk += "\\vgk_new.sys";
-		//vgk += "\\EasyAntiCheat_26aa6eb638137d17330be2df98352115.sys";
+		//vgk += "\\vgk_new.sys";
+		vgk += "\\EasyAntiCheat_26aa6eb638137d17330be2df98352115.sys";
 		Logger::Log(true, ConsoleColor::DARK_GREEN, "Full path: %s \n", ntoskrnl2);
 	}
 	else {
@@ -75,13 +75,10 @@ void mainThread() {
 	}
 
 	peLoader.FILE_handle = 0x1000;
-	
-	peLoader.GetAllDriverBaseAddresses();
-	
-	Emu(uc)->alloc(0x1000, 0xffffffff00000000);
-	Emu(uc)->alloc(0x1000, 0x10000000, MUC_PROT_ALL);
-	uc_context_alloc(uc, &peLoader.ucContext);
 
+	peLoader.GetAllDriverBaseAddresses();
+
+	uc_context_alloc(uc, &peLoader.ucContext);
 
 	Unicorn _uc{};
 	bool check = peLoader.LoadPE(vgk);
@@ -96,14 +93,58 @@ void mainThread() {
 	peLoader.MapAllDriversFromKdmp();
 
 	uc_hook trace, traces, trace_mem, trace_nt, t;
-	Emu(uc)->hook_add(&trace_mem, UC_HOOK_MEM_INVALID, (void*)Unicorn::hook_mem_invalid, NULL, 1, 0);
-	Emu(uc)->hook_add(&trace_mem, UC_HOOK_INSN_INVALID, (void*)Unicorn::hook_mem_invalid, NULL, 1, 0);
+
+	Emu(uc)->hook_add(&trace_mem, UC_HOOK_MEM_INVALID, (void*)Unicorn::hook_mem_invalid, ti, 1, 0);
+	Emu(uc)->hook_add(&trace_mem, UC_HOOK_INSN_INVALID, (void*)Unicorn::hook_mem_invalid, ti, 1, 0);
 	Emu(uc)->hook_add(&intr_hook, UC_HOOK_INTR, (void*)Unicorn::catch_error, nullptr, 1, 0);
-	Emu(uc)->hook_add(&t, UC_HOOK_CODE, Unicorn::register_hook, NULL, peLoader.peFiles[0]->Base, peLoader.peFiles[0]->End);
+	uc_hook h_block;
+	//uc_hook_add(uc, &h_block,UC_HOOK_BLOCK,(void*)Unicorn::hook_block_track,NULL,peLoader.peFiles[0]->Base, peLoader.peFiles[0]->End);
+	uc_hook h_edge;
+	//c_hook_add(uc, &h_edge,UC_HOOK_EDGE_GENERATED,(void*)Unicorn::hook_edge_generated,NULL,peLoader.peFiles[0]->Base, peLoader.peFiles[0]->End);
+	//Emu(uc)->hook_add(&t, UC_HOOK_CODE, Unicorn::register_hook, NULL, peLoader.peFiles[0]->Base, peLoader.peFiles[0]->End);
 	//Emu(uc)->hook_add(&t, UC_HOOK_CODE, Unicorn::register_hook, NULL, 1,0);
+	//Emu(uc)->hook_add(&t, UC_HOOK_CODE, Unicorn::register_hook, NULL, 0xfffff805dc9a154d, 0xfffff805dc9a154d);
+	//Emu(uc)->hook_add(&t, UC_HOOK_CODE, Unicorn::register_hook, NULL, 0xfffff805dca8e6f5, 0xfffff805dca8e6f5);
+	//Emu(uc)->hook_add(&t, UC_HOOK_CODE, Unicorn::register_hook, NULL, 0xfffff805dca31d56, 0xfffff805dca31d56);
+	//Emu(uc)->hook_add(&t, UC_HOOK_CODE, Unicorn::register_hook, NULL, 0xfffff805dca31d80, 0xfffff805dca31d80);
+	//Emu(uc)->hook_add(&t, UC_HOOK_CODE, Unicorn::register_hook, NULL, 0xfffff805dca31d82, 0xfffff805dca31d82);
+	//Emu(uc)->hook_add(&t, UC_HOOK_CODE, Unicorn::register_hook, NULL, 0xfffff805dca31dd0, 0xfffff805dca31dd0);
+	//Emu(uc)->hook_add(&t, UC_HOOK_CODE, Unicorn::register_hook, NULL, 0xfffff805dcabbff9, 0xfffff805dcabbff9);
+	//Emu(uc)->hook_add(&t, UC_HOOK_CODE, Unicorn::register_hook, NULL, 0xfffff805dca31c02, 0xfffff805dca31c02);
+	//Emu(uc)->hook_add(&t, UC_HOOK_CODE, Unicorn::register_hook, NULL, 0xfffff805dca31c46, 0xfffff805dca31c46);
+	//Emu(uc)->hook_add(&t, UC_HOOK_CODE, Unicorn::register_hook, NULL, 0xfffff805dca31c93, 0xfffff805dca31c93);
+
+	auto exports = g_Debugger->ListAllFunctionsByDbgEng("ntoskrnl.exe");
+
 	for (const auto& pair : _uc.NtfuncMap) {
-		_uc.hook_File_func(uc, "t", pair.first, pair.second);
+		_uc.hook_Symbol_func(uc, exports, ti, pair.first, pair.second);
 	}
+	/*for (auto& exporta : exports) {
+		if (peLoader.Ntoskrnl_data_Base < exporta.Va && exporta.Va < peLoader.Ntoskrnl_data_End)
+		{
+			auto Obj = std::make_shared<Object>(exporta.Name, exporta.Va, 0);
+			peLoader.objectList.emplace_back(Obj);
+		}
+	}*/
+
+	ULONG SYM_TAG_FUNCTION = 5;
+	ULONG SYM_TAG_PUBLIC_SYMBOL = 10;
+	ULONG SYM_TAG_THUNK = 14;
+	for (auto& exporta : exports) {
+
+		if (exporta.Tag == SYM_TAG_FUNCTION || exporta.Tag == SYM_TAG_PUBLIC_SYMBOL)
+		{
+
+			auto Obj = std::make_shared<Object>(exporta.Name, exporta.Va, 0);
+			peLoader.objectList.emplace_back(Obj);
+		}
+
+	}
+
+
+	/*for (const auto& pair : _uc.NtfuncMap) {
+		_uc.hook_File_func(uc, "t", pair.first, pair.second);
+	}*/
 	for (const auto& pair : _uc.CngFuncMap) {
 		_uc.hook_File_func(uc, "t", pair.first, pair.second);
 	}
@@ -111,13 +152,7 @@ void mainThread() {
 		_uc.hook_File_func(uc, "t", pair.first, pair.second);
 	}
 
-	for (auto object : peLoader.objectList) {
-		// MOD_TEST
-		// Emu(uc)->hook_add(&t, UC_HOOK_MEM_READ | UC_HOOK_MEM_WRITE, (void*)Unicorn::hook_access_object, (void*)object, object->address, object->address + object->size);
-		Emu(uc)->hook_add(&t, UC_HOOK_MEM_READ | UC_HOOK_MEM_WRITE, (void*)Unicorn::hook_access_object, (void*)object.get(), object->address, object->address + object->size);
-	}
 
-	
 	bool KdDebuggerNotPresent = 1;
 	bool KdDebuggerEnabled = 0;
 	for (auto& peFile : peLoader.peFiles)
@@ -132,6 +167,14 @@ void mainThread() {
 		}
 
 	}
+	for (auto object : peLoader.objectList) {
+		// MOD_TEST
+		// Emu(uc)->hook_add(&t, UC_HOOK_MEM_READ | UC_HOOK_MEM_WRITE, (void*)Unicorn::hook_access_object, (void*)object, object->address, object->address + object->size);
+		Emu(uc)->hook_add(&t, UC_HOOK_CODE, (void*)Unicorn::hook_access_objectH, (void*)object.get(), object->address, object->address + object->size);
+	}
+	/*for (auto object : peLoader.objectList) {
+		Emu(uc)->hook_add(&t, UC_HOOK_MEM_READ, (void*)Unicorn::hook_access_object, (void*)object.get(), object->address, object->address + object->size);
+	}*/
 
 	peLoader.ExecuteFromRip = peLoader.peFiles[0]->Entry;
 
@@ -175,7 +218,7 @@ void mainThread() {
 			}
 		}
 
-		Sleep(1000);	
+		Sleep(1000);
 	}
 }
 

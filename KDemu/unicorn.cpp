@@ -13,10 +13,10 @@ uint64_t Previous_address = 0;
 
 namespace {
 	constexpr size_t kPageSize = 0x1000;
-		inline bool match(const uint8_t* buf, uint32_t size, std::initializer_list<uint8_t> pattern) {
-			if (size < pattern.size()) return false;
-			return !std::memcmp(pattern.begin(), buf, pattern.size());
-		}
+	inline bool match(const uint8_t* buf, uint32_t size, std::initializer_list<uint8_t> pattern) {
+		if (size < pattern.size()) return false;
+		return !std::memcmp(pattern.begin(), buf, pattern.size());
+	}
 
 	inline int32_t read_disp32_at(const uint8_t* buf, uint32_t size, uint32_t offset) {
 		if (size < offset + 4) return 0;
@@ -48,20 +48,18 @@ void Unicorn::seh_Handle(uc_engine* uc)
 	emu->rcx(error);
 	emu->rsp(rsp);
 	emu->rip(loader->RtlRaiseStatusBase);
-	Sleep(1);
 }
-
 void Unicorn::register_hook(uc_engine* uc, uint64_t address, const byte size, void* user_data)
 {
 	PEloader* loader = &PEloader::GetInstance();
 	auto emu = Emu(uc);
+	DWORD tid = GetCurrentThreadId();
 	if (loader->errorevent != nullptr)
 	{
 		for (auto& ti : loader->Threads) {
-			if (ti->threadId == GetCurrentThreadId() && loader->errorevent != ti->Event)
+			if (ti->threadId == tid && loader->errorevent != ti->Event)
 			{
 				WaitForSingleObject(loader->errorevent, INFINITE);
-				Sleep(1);
 			}
 		}
 	}
@@ -98,13 +96,6 @@ void Unicorn::register_hook(uc_engine* uc, uint64_t address, const byte size, vo
 		}
 		if (match(code.data(), size, { 0x0F, 0x20 })) {
 			Logger::Log(true, 13, "Read CR0 register address: %llx \n", address);
-			/*return;
-			uint64_t cr0 = emu->cr0();
-			cr0 = 0x000000080050033;
-			emu->rax(cr0);
-			address += 2;
-			emu->rip(address);
-			ShowRegister(uc);*/
 		}
 		if (match(code.data(), size, { 0x0F, 0x30 })) {
 			uint64_t rip = emu->rip();
@@ -146,13 +137,7 @@ void Unicorn::register_hook(uc_engine* uc, uint64_t address, const byte size, vo
 			}
 
 		}
-		if (match(code.data(), size, { 0xCD, 0x20 }))
-		{
-			Logger::Log(true, 12, "INT 20\n");
-			uint64_t rip = emu->rip();
-			rip += 2;
-			emu->rip(rip);
-		}
+
 	}
 
 	if (size >= 3) {
@@ -222,13 +207,12 @@ void Unicorn::register_hook(uc_engine* uc, uint64_t address, const byte size, vo
 
 	Previous_address = address;
 	for (auto& ti : loader->Threads) {
-		if (ti->threadId == GetCurrentThreadId())
+		if (ti->threadId == tid)
 		{
 			ti->paddress = address;
 		}
 	}
 }
-
 void Unicorn::catch_error(uc_engine* uc, int exception, void* user_data) {
 	PEloader* loader = &PEloader::GetInstance();
 	uint64_t rip;
@@ -239,37 +223,49 @@ void Unicorn::catch_error(uc_engine* uc, int exception, void* user_data) {
 	auto cpu = reinterpret_cast<CPUState*>(u->cpu);
 	auto env = reinterpret_cast<CPUX86StateProbe*>(cpu->env_ptr);
 	env->old_exception = -1;
-	if (loader->peFiles[1]->Base < rip && loader->peFiles[1]->End > rip)
-	{
-		uint8_t buf[15];
-		if (uc_mem_read(uc, rip, buf, sizeof(buf)) == UC_ERR_OK) {
-			csh h; cs_insn* insn;
-			cs_open(CS_ARCH_X86, CS_MODE_64, &h);
-			if (cs_disasm(h, buf, sizeof(buf), rip, 1, &insn) == 1) {
-				size_t size = insn[0].size; // ← 指令長度
-				std::vector<uint8_t> code = Emu(uc)->read(rip, size);
-				if (match(code.data(), size, { 0x48, 0xCF })) {
-					uc_hook t;
-					Logger::Log(true, 13, "IRET %llx\n", rip);
 
-					uint64_t old_rsp = Emu(uc)->rsp();
-					uint64_t old_cs = Emu(uc)->cs();
 
-					uint64_t new_rip = qword_load(uc, old_rsp + 0x00);
-					uint64_t new_cs = qword_load(uc, old_rsp + 0x08);
-					uint64_t new_fl = qword_load(uc, old_rsp + 0x10);
-					uint64_t new_rsp = qword_load(uc, old_rsp + 0x18);
-					uint64_t new_ss = qword_load(uc, old_rsp + 0x20);
-					Emu(uc)->eflags(new_fl);
-					Emu(uc)->cs(new_cs);
-					Emu(uc)->rsp(new_rsp);
-					Emu(uc)->rip(new_rip);
-				}
+	uint8_t buf[15];
+	if (uc_mem_read(uc, rip, buf, sizeof(buf)) == UC_ERR_OK) {
+		csh h; cs_insn* insn;
+		cs_open(CS_ARCH_X86, CS_MODE_64, &h);
+		if (cs_disasm(h, buf, sizeof(buf), rip, 1, &insn) == 1) {
+			size_t size = insn[0].size; // ← 指令長度
+			std::vector<uint8_t> code = Emu(uc)->read(rip, size);
+			if (match(code.data(), size, { 0x48, 0xCF })) {
+				uc_hook t;
+				Logger::Log(true, 13, "IRET %llx\n", rip);
+
+				uint64_t old_rsp = Emu(uc)->rsp();
+				uint64_t old_cs = Emu(uc)->cs();
+
+				uint64_t new_rip = qword_load(uc, old_rsp + 0x00);
+				uint64_t new_cs = qword_load(uc, old_rsp + 0x08);
+				uint64_t new_fl = qword_load(uc, old_rsp + 0x10);
+				uint64_t new_rsp = qword_load(uc, old_rsp + 0x18);
+				uint64_t new_ss = qword_load(uc, old_rsp + 0x20);
+				Emu(uc)->eflags(new_fl);
+				Emu(uc)->cs(new_cs);
+				Emu(uc)->rsp(new_rsp);
+				Emu(uc)->rip(new_rip);
+
 				cs_free(insn, 1);
+				cs_close(&h);
+				return;
 			}
-			cs_close(&h);
+			else
+				cs_free(insn, 1);
 		}
+		cs_close(&h);
+	}
+	switch (exception) {
+	case 0x20:
+		Logger::Log(true, 12, "INT 20\n");
+		rip += 2;
+		Emu(uc)->rip(rip);
 		return;
+	default:
+		break;
 	}
 	seh_Handle(uc);
 	return;
@@ -308,95 +304,29 @@ void Unicorn::catch_error(uc_engine* uc, int exception, void* user_data) {
 	seh_Handle(uc);
 }
 
-
-bool Unicorn::check_is_ntFunc(uint64_t _register)
-{
-	for (auto& peFile : loader->peFiles) {
-
-		if (peFile->FileName == "ntoskrnl.exe")
-		{
-			if (peFile->Base < _register && _register < peFile->End)
-			{
-				auto Ntstr = peFile->FuncRVA[_register - peFile->Base];
-				Unicorn _uc{};
-				if (Ntstr != "" && (
-					Ntstr != "_stricmp" &&
-					Ntstr != "DbgPrompt" &&
-					Ntstr != "KeInitializeGuardedMutex" &&
-					Ntstr != "qsort" &&
-					Ntstr != "KeReadStateTimer" &&
-					Ntstr != "ExAcquireSpinLockShared" &&
-					Ntstr != "ExReleaseSpinLockShared" &&
-					Ntstr != "memset" &&
-					Ntstr != "RtlRaiseStatus" &&
-					Ntstr != "__chkstk" &&
-					Ntstr != "RtlUnwindEx" &&
-					Ntstr != "NtQuerySystemInformation" &&
-					Ntstr != "RtlUnicodeToMultiByteSize" &&
-					Ntstr != "RtlUnicodeToMultiByteN")) {
-					if (_uc.NtfuncMap.find(Ntstr) == _uc.NtfuncMap.end())
-					{
-						Logger::Log(true, ConsoleColor::DARK_GREEN, "Previous_address : 0x%llx\n", Previous_address);
-						Logger::Log(true, 5, "NT Function %s \n", Ntstr.c_str());
-						return true;
-					}
-				}
-			}
-		}
-		else if (peFile->FileName == "cng.sys")
-		{
-			if (peFile->Base < _register && _register < peFile->End)
-			{
-				auto str = peFile->FuncRVA[_register - peFile->Base];
-				if (str != "") {
-					Logger::Log(true, 5, "Cng Function %s \n", str.c_str());
-					return true;
-				}
-			}
-		}
-		else if (peFile->FileName == "CI.dll")
-		{
-			if (peFile->Base < _register && _register < peFile->End)
-			{
-				auto str = peFile->FuncRVA[_register - peFile->Base];
-				if (str != "" && (str != "CiFreePolicyInfo" && str != "CiCheckSignedFile" && str != "KeInitializeGuardedMutex"))
-				{
-					Logger::Log(true, 5, "Ci Function %s \n", str.c_str());
-
-					return true;
-				}
-			}
-		}
-		else
-		{
-
-			if (peFile->Base < _register && _register < peFile->End)
-			{
-				Logger::Log(true, ConsoleColor::DARK_GREEN, "next RIP : %llx \n", _register);
-				return true;
-			}
-		}
-
-	}
-	return false;
-}
-
 bool Unicorn::hook_mem_invalid(uc_engine* uc, uc_mem_type type, uint64_t address, int size, int64_t value, void* user_data) {
-	DWORD tid = GetCurrentThreadId();
-
+	ThreadInfo_t* obj = reinterpret_cast<ThreadInfo_t*>(user_data);
 	for (auto& ti : loader->Threads) {
-		ResetEvent(ti->Event);
-		if (ti->threadId == tid) {
-			if (loader->errorevent != nullptr && loader->errorevent != ti->Event)
-			{
-				WaitForSingleObject(loader->errorevent, INFINITE);
-				Sleep(1);
-			}
-			loader->errorevent = ti->Event;
-			Previous_address = ti->paddress;
-			Sleep(1);
+
+		if (ti->threadId != obj->threadId) {
+			ResetEvent(ti->Event);
 		}
 	}
+	if (loader->errorevent != nullptr)
+	{
+		if (loader->errorevent != obj->Event)
+		{
+			WaitForSingleObject(loader->errorevent, INFINITE);
+		}
+		loader->errorevent = obj->Event;
+		Previous_address = obj->paddress;
+	}
+	else
+	{
+		loader->errorevent = obj->Event;
+		Previous_address = obj->paddress;
+	}
+
 
 	uint32_t count;
 	uint64_t msize, rip, rsp;
@@ -508,7 +438,7 @@ bool Unicorn::hook_mem_invalid(uc_engine* uc, uc_mem_type type, uint64_t address
 				err = uc_mem_write(uc, aligned_address, loader->kdmp.GetVirtualPage(aligned_address), 0x1000);
 				if (err != UC_ERR_OK)
 				{
-					Logger::Log(true, ConsoleColor::RED, "READ from unmapped memory Address error: %d\n", err);
+					Logger::Log(true, ConsoleColor::RED, "READ from unmapped memory Address error: %x\n", err);
 				}
 				break;
 			}
@@ -523,6 +453,7 @@ bool Unicorn::hook_mem_invalid(uc_engine* uc, uc_mem_type type, uint64_t address
 		Logger::Log(true, ConsoleColor::RED, "------------------------------\n");
 		Logger::Log(true, ConsoleColor::DARK_GREEN, "Previous_address : %llx\n", Previous_address);
 		Logger::Log(true, ConsoleColor::RED, "------------------------------\n");
+		ShowRegister(uc);
 		break;
 	case UC_MEM_WRITE_UNMAPPED:
 
@@ -689,19 +620,53 @@ bool Unicorn::hook_mem_invalid(uc_engine* uc, uc_mem_type type, uint64_t address
 	return true;
 }
 
+void Unicorn::hook_access_objectH(uc_engine* uc, uint64_t address, uint32_t size, void* user_data)
+{
+	Object* obj = reinterpret_cast<Object*>(user_data);
+	Logger::Log(true, ConsoleColor::BLUE, "HOOK_CODE %s at address: 0x%llx \n", obj->name.c_str(), address);
+}
 void Unicorn::hook_access_object(uc_engine* uc, uc_mem_type type, uint64_t address, int size, int64_t value, void* user_data) {
-	Object* obj = (Object*)user_data;
-	uint64_t rip;
+	Object* obj = reinterpret_cast<Object*>(user_data);
+	uint64_t rip = Emu(uc)->rip();
+	/*if (loader->peFiles[1]->Base < rip && rip < loader->peFiles[1]->End)
+		return;*/
+	//Emu(uc)->try_read(address, &value, sizeof(value));
+	Logger::Log(true, ConsoleColor::BLUE, "Read %s + 0x%llx at address: 0x%llx Value: %llx\n", obj->name.c_str(), address - obj->address, rip, value);
+}
 
-	uc_reg_read(uc, UC_X86_REG_RIP, &rip);
-	switch (type) {
-	case UC_MEM_READ:
-		uc_mem_read(uc, address, &value, sizeof(value));
-		Logger::Log(true, ConsoleColor::BLUE, "Read %s + 0x%llx at address: 0x%llx Value: %llx\n", obj->name.c_str(), address - obj->address, rip, value);
-		break;
-	case UC_MEM_WRITE:
-		Logger::Log(true, ConsoleColor::BLUE, "Write %s + 0x%llx at address: 0x%llx Value: %llx\n", obj->name.c_str(), address - obj->address, rip, value);
-		break;
+static uint64_t g_prev_block_addr = 0;
+
+// 用來統計 edge 數量
+static uint64_t g_edge_count = 0;
+
+// BLOCK hook：更新 g_prev_block_addr
+void Unicorn::hook_block_track(uc_engine* uc, uint64_t address, uint32_t size, void* user_data)
+{
+	// 每進一個 block，更新上一個 block 地址
+	g_prev_block_addr = address;
+
+	Logger::Log(true, ConsoleColor::BLUE, "hook_block_track address: 0x%llx \n", address);
+}
+
+// EDGE_GENERATED hook：每當產生一條新 edge 就會被叫
+void Unicorn::hook_edge_generated(uc_engine* uc, uc_tb* cur, uc_tb* prev, void* user_data)
+{
+	g_edge_count++;
+	auto emu = Emu(uc);
+	uint64_t rips;
+	uc_reg_read(uc, UC_X86_REG_RIP, &rips);
+	uint64_t rip = emu->rip();
+
+	// uc_tb 裡才有「真正的 guest PC」
+	uint64_t cur_pc = cur->pc;
+	uint32_t cur_sz = cur->size;
+
+	if (prev) {
+		uint64_t prev_last_pc = prev->pc + prev->size - 1;
+		Logger::Log(true, ConsoleColor::BLUE, "EDGE: 0x%016" PRIx64 "  ->  0x%016" PRIx64 "\n", prev_last_pc, cur_pc);
+	}
+	else {
+		printf("EDGE: entry -> 0x%016" PRIx64 "\n", cur_pc);
 	}
 }
 
@@ -736,7 +701,7 @@ void Unicorn::hook_mem_write(uc_engine* uc, uc_mem_type type, uint64_t address, 
 // MOD_TEST
 void Unicorn::hook_File_func(uc_engine* uc, std::string fileName, std::string funcName, void(*func)(uc_engine*, uint64_t, uint32_t, void*)) {
 	for (auto& peFile : loader->peFiles) {
-		uint64_t Base = peFile->Base;		
+		uint64_t Base = peFile->Base;
 		uint64_t RVA = peFile->FuncAddr[funcName];
 		uc_hook trace;
 		if (RVA != 0) {
@@ -745,6 +710,15 @@ void Unicorn::hook_File_func(uc_engine* uc, std::string fileName, std::string fu
 	}
 }
 
+void Unicorn::hook_Symbol_func(uc_engine* uc, std::vector<ExportFunctionInfo> exports,void * user_data, std::string funcName, void(*func)(uc_engine*, uint64_t, uint32_t, void*)) {
+	for (auto& exporta : exports) {
+		if (exporta.Name == funcName) {
+			uc_hook trace;
+			uc_hook_add(uc, &trace, UC_HOOK_CODE, (void*)func, user_data, exporta.Va, exporta.Va + sizeof(uint8_t));
+			return;
+		}
+	}
+}
 crt_buffer_t::crt_buffer_t() : m_cbSize(0), m_pBuffer(NULL)
 {
 }

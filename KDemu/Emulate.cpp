@@ -64,9 +64,9 @@ uint64_t Emulate::AllocVirtPhysPage(uint64_t virtAddr) {
 uint64_t Emulate::HeapAlloc(uc_engine* uc, uint64_t size) {
 	return Emu(uc)->HeapAlloc(size);
 }
-uint64_t Emulate::HeapAlloc(uc_engine* uc, uint64_t size, bool show) {
+uint64_t Emulate::HeapAlloc(uc_engine* uc, uint64_t size, bool show, void* user_data) {
 	auto emuc = Emu(uc);
-	return emuc->HeapAlloc(size, show);
+	return emuc->HeapAlloc(size, show, user_data);
 }
 void Emulate::HeapFree(uint64_t addr) {
 	Emu(loader->uc)->HeapFree(addr);
@@ -110,15 +110,14 @@ void Emulate::RtlAnsiStringToUnicodeString(uc_engine* uc, uint64_t address, uint
 
 	emu->write(unicode_str_ptr, &ustr, sizeof(ustr));
 	uint64_t status = 0;
-    emu->rax(status);
+	emu->rax(status);
 	RetHook(uc);
 }
 
 void Emulate::RtlInitString(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
-	Logger::Log(true, ConsoleColor::RED, "RtlInitString\n");
 	auto emu = Emu(uc);
 	uint64_t ansi_string_ptr = emu->rcx();
-    uint64_t source_ptr = emu->rdx();
+	uint64_t source_ptr = emu->rdx();
 	std::string str;
 	char ch;
 	int offset = 0;
@@ -160,7 +159,7 @@ void Emulate::RtlTimeFieldsToTime(uc_engine* uc, uint64_t address, uint32_t size
 	Logger::Log(true, ConsoleColor::RED, "RtlTimeFieldsToTime\n");
 	auto emu = Emu(uc);
 	uint64_t tf_ptr = emu->rcx();
-    uint64_t time_ptr = emu->rdx();
+	uint64_t time_ptr = emu->rdx();
 	TIME_FIELDS tf = emu->read<TIME_FIELDS>(tf_ptr);
 
 	SYSTEMTIME st = {
@@ -191,7 +190,7 @@ void Emulate::RtlTimeFieldsToTime(uc_engine* uc, uint64_t address, uint32_t size
 		, result.QuadPart);
 
 	emu->rax(success);
-    RetHook(uc);
+	RetHook(uc);
 }
 
 
@@ -201,7 +200,7 @@ void Emulate::RtlTimeToTimeFields(uc_engine* uc, uint64_t address, uint32_t size
 
 	auto emu = Emu(uc);
 	uint64_t time_ptr = emu->rcx();
-    uint64_t timefields_ptr = emu->rdx();
+	uint64_t timefields_ptr = emu->rdx();
 	LARGE_INTEGER time = emu->read<LARGE_INTEGER>(time_ptr);
 
 	FILETIME ft;
@@ -228,8 +227,8 @@ void Emulate::RtlDuplicateUnicodeString(uc_engine* uc, uint64_t address, uint32_
 	Logger::Log(true, ConsoleColor::RED, "RtlDuplicateUnicodeString\n");
 	auto emu = Emu(uc);
 	uint64_t flags = emu->rcx();
-    uint64_t string_ptr = emu->rdx();
-    uint64_t dest_ptr = emu->r8();
+	uint64_t string_ptr = emu->rdx();
+	uint64_t dest_ptr = emu->r8();
 	UNICODE_STRING string = emu->read<UNICODE_STRING>(string_ptr);
 	if (string.Buffer != NULL && string.Length > 0) {
 		std::wstring unicode_str = read_unicode_string(uc, string_ptr);
@@ -241,7 +240,7 @@ void Emulate::RtlDuplicateUnicodeString(uc_engine* uc, uint64_t address, uint32_
 			}
 			else {
 				utf8_str += '?';
-    		}
+			}
 		}
 		Logger::Log(true, ConsoleColor::RED, "Unicode String: %s\n", utf8_str.c_str());
 	}
@@ -253,10 +252,10 @@ void Emulate::RtlDuplicateUnicodeString(uc_engine* uc, uint64_t address, uint32_
 	dest_string.Length = string.Length;
 	dest_string.MaximumLength = string.MaximumLength;
 	dest_string.Buffer = string.Buffer;
-    emu->write(dest_ptr, &dest_string, sizeof(UNICODE_STRING));
+	emu->write(dest_ptr, &dest_string, sizeof(UNICODE_STRING));
 
 	uint64_t status = 0;
-    emu->rax(status);
+	emu->rax(status);
 	RetHook(uc);
 }
 
@@ -264,8 +263,8 @@ void Emulate::RtlCompareMemory(uc_engine* uc, uint64_t address, uint32_t size, v
 	Logger::Log(true, ConsoleColor::RED, "RtlCompareMemory\n");
 	auto emu = Emu(uc);
 	uint64_t source1 = emu->rcx();
-    uint64_t source2 = emu->rdx();
-    uint64_t length = emu->r8();
+	uint64_t source2 = emu->rdx();
+	uint64_t length = emu->r8();
 	std::vector<uint8_t> buf1 = emu->read(source1, static_cast<size_t>(length));
 	std::vector<uint8_t> buf2 = emu->read(source2, static_cast<size_t>(length));
 
@@ -310,11 +309,11 @@ void Emulate::ExAllocatePoolWithTag(uc_engine* uc, uint64_t address, uint32_t si
 	auto emu = Emu(uc);
 	uint64_t rcx_value = emu->rcx();
 	int a1 = static_cast<int>(rcx_value & 0xFFFFFFFF);
-    uint64_t a2 = emu->rdx();
-    uint64_t a3 = emu->r8();
-    uint64_t allocated_address;
+	uint64_t a2 = emu->rdx();
+	uint64_t a3 = emu->r8();
+	uint64_t allocated_address;
 	Logger::Log(true, ConsoleColor::RED, "ExAllocatePoolWithTag : called with PoolType: %d , NumberOfBytes: %lld,  Tag: %llx\n", a1, a2, a3);
-	allocated_address = HeapAlloc(uc, a2, false);
+	allocated_address = HeapAlloc(uc, a2, false, user_data);
 	emu->rax(allocated_address);
 	RetHook(uc);
 }
@@ -323,7 +322,7 @@ void Emulate::ExFreePoolWithTag(uc_engine* uc, uint64_t address, uint32_t size, 
 	Logger::Log(true, ConsoleColor::RED, "ExFreePoolWithTag\n");
 	auto emu = Emu(uc);
 	uint64_t free_address = emu->rcx();
-    uint64_t tag = emu->rdx();
+	uint64_t tag = emu->rdx();
 	Logger::Log(true, ConsoleColor::DARK_GREEN, "called for address: 0x%llx , Tag : 0x%llx \n", free_address, tag);
 
 	emu->rax(0);
@@ -348,7 +347,6 @@ void Emulate::ExFreePool(uc_engine* uc, uint64_t address, uint32_t size, void* u
 			if (loader->errorevent != nullptr && loader->errorevent != ti->Event)
 			{
 				WaitForSingleObject(loader->errorevent, INFINITE);
-				Sleep(1);
 			}
 			loader->errorevent = ti->Event;
 			Sleep(1);
@@ -357,18 +355,26 @@ void Emulate::ExFreePool(uc_engine* uc, uint64_t address, uint32_t size, void* u
 
 	auto emu = Emu(uc);
 	uint64_t allocated_address = emu->rcx();
-    Logger::Log(true, ConsoleColor::RED, "ExFreePool : allocated_address = %llx \n", allocated_address);
+	Logger::Log(true, ConsoleColor::RED, "ExFreePool : allocated_address = %llx \n", allocated_address);
 
-	// auto it = loader->real_mem_map.find(allocated_address);
+	//auto it = loader->real_mem_map.find(allocated_address);
 	if (!loader->real_mem_map.contains(allocated_address)/*it == loader->real_mem_map.end()*/) {
 		Logger::Log(true, ConsoleColor::RED, "Error: Attempted to free unallocated or invalid address: 0x%llx \n", allocated_address);
 		return;
 	}
-
+	//_aligned_free(it->second.first);
+	//// 释放内存
+	/*uc_err err = uc_mem_unmap(uc, allocated_address, it->second.second);
+	if (err != UC_ERR_OK) {
+		Logger::Log(true, ConsoleColor::RED, "Failed to unmap memory at address: 0x%llx \n", allocated_address);
+		uc_emu_stop(uc);
+		return;
+	}
+	loader->real_mem_map.erase(allocated_address);
+	loader->real_mem_map_type_all.erase(allocated_address);
+	loader->real_mem_map_type_read.erase(allocated_address);
+	loader->real_mem_map_type_read_write.erase(allocated_address);*/
 	emu->rax(0);
-	uint64_t rsp = emu->rsp();
-	if (loader->sysinfo_addr == allocated_address)
-		loader->sysinfo_addr = 0;
 	RetHook(uc);
 
 	for (auto& ti : loader->Threads) {
@@ -383,22 +389,22 @@ void Emulate::IoCreateDevice(uc_engine* uc, uint64_t address, uint32_t size, voi
 	uint64_t rax, rcx, rdx, r8, r9, r10, r11, rsp;
 	auto emu = Emu(uc);
 	rax = emu->rax();
-    rcx = emu->rcx();
-    rdx = emu->rdx();
-    r8 = emu->r8();
-    r9 = emu->r9();
+	rcx = emu->rcx();
+	rdx = emu->rdx();
+	r8 = emu->r8();
+	r9 = emu->r9();
 
 	rsp = emu->rsp();
 	std::wstring var_name = read_unicode_string(uc, r8);
-    rsp = rsp + 8;
+	rsp = rsp + 8;
 	r10 = emu->read<uint64_t>(rsp + 0x20);
-    r11 = emu->read<uint64_t>(rsp + 0x28);
-    uint64_t deviceObjPtr = emu->read<uint64_t>(rsp + 0x30);
-    driverObj = emu->read<DRIVER_OBJECT>(rcx);
+	r11 = emu->read<uint64_t>(rsp + 0x28);
+	uint64_t deviceObjPtr = emu->read<uint64_t>(rsp + 0x30);
+	driverObj = emu->read<DRIVER_OBJECT>(rcx);
 
 	std::string Device_name;
 	std::wstring device_name = read_unicode_string(uc, r8);
-    UnicodeToANSI(device_name, Device_name);
+	UnicodeToANSI(device_name, Device_name);
 
 	uint64_t device_obj_addr = Emulate::HeapAlloc(uc, sizeof(_DEVICE_OBJECT));
 
@@ -439,42 +445,42 @@ void Emulate::IoCreateSymbolicLink(uc_engine* uc, uint64_t address, uint32_t siz
 	Logger::Log(true, ConsoleColor::RED, "IoCreateSymbolicLink\n");
 	auto emu = Emu(uc);
 	uint64_t symbolic_link_str_ptr = emu->rcx();
-    uint64_t device_name_str_ptr = emu->rdx();
+	uint64_t device_name_str_ptr = emu->rdx();
 	std::wstring symbolic_link = read_unicode_string(uc, symbolic_link_str_ptr);
 	std::string ssymbolic_link;
 	UnicodeToANSI(symbolic_link, ssymbolic_link);
 	uint64_t rsp = emu->rsp();
-    std::wstring device_name = read_unicode_string(uc, device_name_str_ptr);
+	std::wstring device_name = read_unicode_string(uc, device_name_str_ptr);
 	std::string sdevice_name;
 	UnicodeToANSI(device_name, sdevice_name);
 	Logger::Log(true, ConsoleColor::RED, "  called  SymbolicLink: %s DeviceName: %s \n", ssymbolic_link, sdevice_name.c_str());
 
 	uint64_t t;
 	emu->rax(0);
-    RetHook(uc);
+	RetHook(uc);
 }
 
 void Emulate::ZwFlushKey(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
 	Logger::Log(true, ConsoleColor::RED, "ZwFlushKey \n");
 	auto emu = Emu(uc);
 	uint64_t keyHandle = emu->rcx();
-    Logger::Log(true, ConsoleColor::DARK_GREEN, "Flushing key : 0x%llx \n", keyHandle);
+	Logger::Log(true, ConsoleColor::DARK_GREEN, "Flushing key : 0x%llx \n", keyHandle);
 
 	emu->rax(0);
-    RetHook(uc);
+	RetHook(uc);
 }
-std::map<uint64_t, HANDLE> r3SectionMap;uint64_t nextFakeHandle = 0x10000;
+std::map<uint64_t, HANDLE> r3SectionMap; uint64_t nextFakeHandle = 0x10000;
 void Emulate::ZwCreateSection(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
 	auto emu = Emu(uc);
 	uint64_t SectionHandlePtr = emu->rcx();
-    uint64_t DesiredAccess = emu->rdx();
+	uint64_t DesiredAccess = emu->rdx();
 	uint64_t ObjectAttributes = emu->r8();
 	uint64_t MaximumSizePtr = emu->r9();
 
 	uint64_t rsp = emu->rsp();
 	uint64_t Protection = emu->read<uint64_t>(rsp + 0x28);
-    uint64_t AllocationAttributes = emu->read<uint64_t>(rsp + 0x30);
-    uint64_t FileHandle = emu->read<uint64_t>(rsp + 0x38);
+	uint64_t AllocationAttributes = emu->read<uint64_t>(rsp + 0x30);
+	uint64_t FileHandle = emu->read<uint64_t>(rsp + 0x38);
 	uint64_t maxSize = 0x1000;
 	if (MaximumSizePtr)
 		maxSize = emu->read<uint64_t>(MaximumSizePtr);
@@ -529,7 +535,7 @@ void Emulate::ZwClose(uc_engine* uc, uint64_t address, uint32_t size, void* user
 	}
 
 	emu->rax(0);
-    RetHook(uc);
+	RetHook(uc);
 }
 void Emulate::PsGetCurrentProcess(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
 	Logger::Log(true, ConsoleColor::RED, "PsGetCurrentProcess\n");
@@ -546,17 +552,18 @@ void Emulate::PsGetCurrentProcess(uc_engine* uc, uint64_t address, uint32_t size
 
 	PEloader* loader = &PEloader::GetInstance();
 
-	RetHook(uc);}
+	RetHook(uc);
+}
 void Emulate::KeStackAttachProcess(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
 	Logger::Log(true, ConsoleColor::RED, "KeStackAttachProcess\n");
 	auto emu = Emu(uc);
 	uint64_t eprocess = emu->rcx();
-    uint64_t apc_state_ptr = emu->rdx();
-    uint64_t gsBase = emu->gs_base();
+	uint64_t apc_state_ptr = emu->rdx();
+	uint64_t gsBase = emu->gs_base();
 	uint64_t kthread = emu->read<uint64_t>(gsBase + 0x188);
 
 	uint64_t apcStateOffset = 0x98;
-    uint64_t currentApcState = emu->read<uint64_t>(kthread + apcStateOffset);
+	uint64_t currentApcState = emu->read<uint64_t>(kthread + apcStateOffset);
 	uint64_t old_process = emu->read<uint64_t>(currentApcState);
 
 	if (eprocess != 0)
@@ -578,7 +585,7 @@ void Emulate::KeStackAttachProcess(uc_engine* uc, uint64_t address, uint32_t siz
 	}
 	Logger::Log(true, ConsoleColor::DARK_GREEN, "Attached to EPROCESS = 0x%llx\n", eprocess);
 	emu->rax(0);
-    RetHook(uc);
+	RetHook(uc);
 }
 
 void Emulate::KeUnstackDetachProcess(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
@@ -598,13 +605,10 @@ void Emulate::ExGetFirmwareEnvironmentVariable(uc_engine* uc, uint64_t address, 
 
 	uint64_t rsp = emu->rsp();
 	uint64_t return_len_ptr = emu->read<uint64_t>(rsp + 0x20);
-
 	uint32_t value_len_temp = emu->read<uint32_t>(value_len);
 
-
-
 	std::wstring var_name = read_unicode_string(uc, var_name_ptr);
-    int var_name_len = WideCharToMultiByte(CP_UTF8, 0, var_name.c_str(), -1, nullptr, 0, nullptr, nullptr);
+	int var_name_len = WideCharToMultiByte(CP_UTF8, 0, var_name.c_str(), -1, nullptr, 0, nullptr, nullptr);
 	char* var_name_mb = new char[var_name_len];
 	WideCharToMultiByte(CP_UTF8, 0, var_name.c_str(), -1, var_name_mb, var_name_len, nullptr, nullptr);
 	Logger::Log(true, ConsoleColor::DARK_GREEN, "var_name: %s\n", var_name_mb);
@@ -620,7 +624,8 @@ void Emulate::ExGetFirmwareEnvironmentVariable(uc_engine* uc, uint64_t address, 
 	delete[] guid_mb;
 
 	auto status = STATUS_SUCCESS;
-	RetHook(uc);}
+	RetHook(uc);
+}
 
 
 
@@ -641,7 +646,7 @@ void Emulate::MmBuildMdlForNonPagedPool(uc_engine* uc, uint64_t address, uint32_
 	uint16_t MdlFlags = emu->read<uint16_t>(mdl_addr + offsetof(FAKE_MDL, MdlFlags));
 
 	MdlFlags |= 0x0002;
-    emu->write(mdl_addr + offsetof(FAKE_MDL, MdlFlags), &MdlFlags, sizeof(MdlFlags));
+	emu->write(mdl_addr + offsetof(FAKE_MDL, MdlFlags), &MdlFlags, sizeof(MdlFlags));
 
 	Logger::Log(true, ConsoleColor::DARK_GREEN, "Setting MDL @ 0x%llx MdlFlags = 0x%llx\n", mdl_addr, MdlFlags);
 
@@ -664,7 +669,7 @@ void Emulate::IoAllocateMdl(uc_engine* uc, uint64_t address, uint32_t size, void
 	mdl.StartVa = VirtualAddress;
 	mdl.ByteCount = Length;
 	mdl.MappedSystemVa = VirtualAddress;
-    emu->write(mdl_addr, &mdl, sizeof(mdl));
+	emu->write(mdl_addr, &mdl, sizeof(mdl));
 
 	Logger::Log(true, ConsoleColor::DARK_GREEN, "Alloc MDL  0x%llx VA: 0x%llx, Len= %lld\n", mdl_addr, VirtualAddress, Length);
 
@@ -676,10 +681,10 @@ void Emulate::MmAllocateContiguousMemorySpecifyCache(uc_engine* uc, uint64_t add
 	Logger::Log(true, ConsoleColor::RED, "MmAllocateContiguousMemorySpecifyCache\n");
 	auto emu = Emu(uc);
 	SIZE_T NumberOfBytes = static_cast<SIZE_T>(emu->rcx());
-    uint64_t LowestAcceptableAddress = emu->rdx();
-    uint64_t HighestAcceptableAddress = emu->r8();
-    uint64_t BoundaryAddressMultiple = emu->r9();
-    uint64_t rsp = emu->rsp();
+	uint64_t LowestAcceptableAddress = emu->rdx();
+	uint64_t HighestAcceptableAddress = emu->r8();
+	uint64_t BoundaryAddressMultiple = emu->r9();
+	uint64_t rsp = emu->rsp();
 	Logger::Log(true, ConsoleColor::DARK_GREEN, "\tLowest : %llx - Highest : %llx - Boundary : %llx - Size : %08x\n", LowestAcceptableAddress, HighestAcceptableAddress, BoundaryAddressMultiple, NumberOfBytes);
 	loader->AllocatedContiguous = (uint64_t)HeapAlloc(uc, NumberOfBytes);
 	emu->rax(loader->AllocatedContiguous);
@@ -719,13 +724,13 @@ void Emulate::ObRegisterCallbacks(uc_engine* uc, uint64_t address, uint32_t size
 	uint64_t context;
 
 	count = emu->read<uint16_t>(registration_addr + 4);
-    context = emu->read<uint64_t>(registration_addr + 0x10);
-    op_array = emu->read<uint64_t>(registration_addr + 0x18);
+	context = emu->read<uint64_t>(registration_addr + 0x10);
+	op_array = emu->read<uint64_t>(registration_addr + 0x18);
 	uint64_t fake_handle = 0xDEADBEEF00000001;
 	emu->write(handle_ptr, &fake_handle, sizeof(fake_handle));
 
 	uint64_t status = 0;
-    emu->rax(status);
+	emu->rax(status);
 	Logger::Log(true, ConsoleColor::DARK_GREEN, " %llx\n", count);
 	RetHook(uc);
 }
@@ -751,7 +756,7 @@ void Emulate::CmRegisterCallbackEx(uc_engine* uc, uint64_t address, uint32_t siz
 	Logger::Log(true, ConsoleColor::DARK_GREEN, " Registered Callback: 0x%llx , Altitude: %s\n", fn, altitude.c_str());
 
 	uint64_t status = 0;
-    emu->rax(status);
+	emu->rax(status);
 	RetHook(uc);
 }
 void Emulate::ObUnRegisterCallbacks(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
@@ -772,7 +777,7 @@ void Emulate::ZwWaitForSingleObject(uc_engine* uc, uint64_t address, uint32_t si
 	Logger::Log(true, ConsoleColor::RED, "ZwWaitForSingleObject\n");
 	auto emu = Emu(uc);
 	uint64_t status = 0;
-    emu->rax(status);
+	emu->rax(status);
 	RetHook(uc);
 }
 void Emulate::InitializeSListHead(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
@@ -867,7 +872,7 @@ void Emulate::ExRegisterCallback(uc_engine* uc, uint64_t address, uint32_t size,
 	Logger::Log(true, ConsoleColor::DARK_GREEN, "object = 0x%llx, fn=0x%llx, ctx=0x%llx\n", callback_object, callback_fn, callback_ctx);
 
 	uint64_t reg_handle = callback_fn;
-    emu->rax(reg_handle);
+	emu->rax(reg_handle);
 	RetHook(uc);
 }
 void Emulate::ExUnregisterCallback(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
@@ -904,7 +909,7 @@ void Emulate::_CiCheckSignedFile(uc_engine* uc, uint64_t address, uint32_t size,
 		copiedDigestBufferData = emu->read(digestBuffer, static_cast<size_t>(digestSize));
 	}
 	const uint64_t WIN_CERTIFICATE_SIZE = 8;
-    std::vector<uint8_t> copiedWinCertData;
+	std::vector<uint8_t> copiedWinCertData;
 	if (winCert != 0) {
 		copiedWinCertData = emu->read(winCert, static_cast<size_t>(WIN_CERTIFICATE_SIZE));
 	}
@@ -940,9 +945,17 @@ void Emulate::KeWaitForMultipleObjects(uc_engine* uc, uint64_t address, uint32_t
 	uint64_t WaitMode = emu->read<uint64_t>(rsp + 0x28);
 	uint64_t Alertable = emu->read<uint64_t>(rsp + 0x30);
 	uint64_t TimeoutAddr = emu->read<uint64_t>(rsp + 0x38);
-
-
-
+	const uint32_t ps = 8;
+	uint64_t bytes = Count * ps;
+	std::vector<uint64_t> objects(static_cast<size_t>(Count));
+	emu->try_read(ObjectArrayAddr, objects.data(), (uint32_t)bytes);
+	std::vector<HANDLE> waitHandles(static_cast<size_t>(Count));
+	for (size_t i = 0; i < Count; i++)
+	{
+		HANDLE h;
+		emu->try_read(objects[i], &h, sizeof(h));
+		waitHandles[i] = h;
+	}
 	DWORD timeout_ms = INFINITE;
 	if (TimeoutAddr != 0) {
 		LARGE_INTEGER timeoutVal;
@@ -952,8 +965,8 @@ void Emulate::KeWaitForMultipleObjects(uc_engine* uc, uint64_t address, uint32_t
 
 	DWORD result = 0;
 	WaitForMultipleObjects(
-		static_cast<DWORD>(loader->waitHandles.size()),
-		loader->waitHandles.data(),
+		Count,
+		waitHandles.data(),
 		WaitType,
 		timeout_ms
 	);
@@ -1093,7 +1106,7 @@ void Emulate::MmGetPhysicalAddress(uc_engine* uc, uint64_t address, uint32_t siz
 		Logger::Log(true, DARK_GREEN, "\tGetting physical for last Contiguous Allocated Memory.\n");
 	}
 	if (baseAddress == 0xf0f87c3e1000) {
-		ret = 0x1ad000;
+		ret = 0x6d4000;
 	}
 	else if (baseAddress == 0xfb7dbedf6000) {
 		ret = 0x200000;
@@ -1118,7 +1131,7 @@ void Emulate::ZwOpenSection(uc_engine* uc, uint64_t address, uint32_t size, void
 	Logger::Log(true, ConsoleColor::RED, "ZwOpenSection \n");
 	auto emu = Emu(uc);
 	uint64_t sectionHandlePtr = emu->rcx();
-    uint64_t desiredAccess = emu->rdx();
+	uint64_t desiredAccess = emu->rdx();
 	uint64_t objectAttrAddr = emu->r8();
 
 	OBJECT_ATTRIBUTES ObjectAttributes = {};
@@ -1137,7 +1150,7 @@ void Emulate::ZwOpenSection(uc_engine* uc, uint64_t address, uint32_t size, void
 	auto ret = __NtRoutine("NtOpenSection", &sectionHandlePtr, desiredAccess, &objAttr);
 
 	uint64_t status = 0;
-    emu->rax(ret);
+	emu->rax(ret);
 
 	RetHook(uc);
 }
@@ -1171,10 +1184,10 @@ void Emulate::ZwQuerySystemInformation(uc_engine* uc, uint64_t address, uint32_t
 	Logger::Log(true, ConsoleColor::RED, "ZwQuerySystemInformation\n");
 	auto emu = Emu(uc);
 	uint64_t SystemInformationClass = emu->rcx();
-    uint64_t SystemInformation = emu->rdx();
-    uint64_t SystemInformationLength = emu->r8();
-    uint64_t ReturnLength = emu->r9();
-    uint64_t rsp;
+	uint64_t SystemInformation = emu->rdx();
+	uint64_t SystemInformationLength = emu->r8();
+	uint64_t ReturnLength = emu->r9();
+	uint64_t rsp;
 
 	Logger::Log(true, ConsoleColor::YELLOW, "SystemInformationClass : 0x%llx SystemInformation: 0x%llx \n", SystemInformationClass, SystemInformation);
 
@@ -1220,7 +1233,7 @@ void Emulate::_vswprintf_s(uc_engine* uc, uint64_t address, uint32_t size, void*
 			SetEvent(ti->Event);
 		}
 		loader->errorevent = nullptr;
-	};
+		};
 
 	Logger::Log(true, ConsoleColor::RED, L"_vswprintf_s\n");
 
@@ -1364,11 +1377,11 @@ void Emulate::KeInitializeTimer(uc_engine* uc, uint64_t address, uint32_t size, 
 
 	struct FAKE_KTIMER {
 		uint8_t Header[0x18];
-    	uint64_t DueTime;
-    	uint64_t TimerListEntry[2];
-    	void* Dpc;
-    	uint32_t Period;
-    };
+		uint64_t DueTime;
+		uint64_t TimerListEntry[2];
+		void* Dpc;
+		uint32_t Period;
+	};
 
 	FAKE_KTIMER fake_timer = {};
 	fake_timer.Header[0] = 0x08;
@@ -1377,7 +1390,7 @@ void Emulate::KeInitializeTimer(uc_engine* uc, uint64_t address, uint32_t size, 
 	Logger::Log(true, ConsoleColor::RED, "KTIMER initialized(fake)\n");
 
 	uint64_t status = 0;
-    emu->rax(status);
+	emu->rax(status);
 	RetHook(uc);
 }
 void Emulate::KeSetTimer(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
@@ -1385,13 +1398,13 @@ void Emulate::KeSetTimer(uc_engine* uc, uint64_t address, uint32_t size, void* u
 
 	auto emu = Emu(uc);
 	uint64_t timer_ptr = emu->rcx();
-    uint64_t due_time_ptr = emu->rdx();
-    uint64_t dpc_ptr = emu->r8();
+	uint64_t due_time_ptr = emu->rdx();
+	uint64_t dpc_ptr = emu->r8();
 	Logger::Log(true, ConsoleColor::DARK_GREEN, "called\n    Timer Ptr:     0x%llx\n    DueTime Ptr:   0x%llx\n    DPC Ptr:       0x%llx", timer_ptr, due_time_ptr, dpc_ptr);
 
 
 	const size_t offset_DueTime = 0x18;
-    const size_t offset_Dpc = 0x28;
+	const size_t offset_Dpc = 0x28;
 	int64_t due_time_value = emu->read<int64_t>(due_time_ptr);
 	Logger::Log(true, ConsoleColor::DARK_GREEN, "DueTime value: %d (100ns units)\n", due_time_value);
 
@@ -1411,7 +1424,7 @@ void Emulate::KeReadStateTimer(uc_engine* uc, uint64_t address, uint32_t size, v
 	return;
 	auto emu = Emu(uc);
 	uint64_t Timer = emu->rcx();
-    int32_t SignalState = 0;
+	int32_t SignalState = 0;
 	emu->try_read(Timer + 0x4, &SignalState, sizeof(SignalState));
 
 	Logger::Log(true, ConsoleColor::DARK_GREEN,
@@ -1427,9 +1440,9 @@ void Emulate::ExCreateCallback(uc_engine* uc, uint64_t address, uint32_t size, v
 	Logger::Log(true, ConsoleColor::RED, "ExCreateCallback\n");
 	auto emu = Emu(uc);
 	uint64_t callbackObjectPtr = emu->rcx();
-    uint64_t ObjectAttributesAddr = emu->rdx();
-    uint64_t create = emu->r8();
-    uint64_t allowMultiple = emu->r9();
+	uint64_t ObjectAttributesAddr = emu->rdx();
+	uint64_t create = emu->r8();
+	uint64_t allowMultiple = emu->r9();
 	OBJECT_ATTRIBUTES ObjectAttributes;
 	ObjectAttributes = emu->read<OBJECT_ATTRIBUTES>(ObjectAttributesAddr);
 	std::wstring file_name_str = read_unicode_string(uc, (uint64_t)ObjectAttributes.ObjectName);
@@ -1456,8 +1469,8 @@ void Emulate::DbgPrompt(uc_engine* uc, uint64_t address, uint32_t size, void* us
 	Logger::Log(true, ConsoleColor::RED, "DbgPrompt\n");
 	auto emu = Emu(uc);
 	uint64_t promptPtr = emu->rcx();
-    uint64_t responsePtr = emu->rdx();
-    uint64_t maxLen = emu->r8();
+	uint64_t responsePtr = emu->rdx();
+	uint64_t maxLen = emu->r8();
 	std::vector<uint8_t> promptBuf = emu->read(promptPtr, 255);
 	promptBuf.push_back(0);
 	std::string prompt(reinterpret_cast<char*>(promptBuf.data()));
@@ -1483,7 +1496,7 @@ void Emulate::ExAcquireRundownProtection(uc_engine* uc, uint64_t address, uint32
 
 	if (count != 0 && count < 0xFFFFFFF0) {
 		count++;
-    	emu->write(rundownRefPtr, count);
+		emu->write(rundownRefPtr, count);
 		success = true;
 	}
 
@@ -1515,7 +1528,7 @@ void Emulate::_wcscpy_s(uc_engine* uc, uint64_t address, uint32_t size, void* us
 
 
 		uint64_t error_code = 22;
-    	emu->rax(error_code);
+		emu->rax(error_code);
 		RetHook(uc);
 		return;
 	}
@@ -1534,7 +1547,7 @@ void Emulate::KeIpiGenericCall(uc_engine* uc, uint64_t address, uint32_t size, v
 	Logger::Log(true, ConsoleColor::RED, "KeIpiGenericCall\n");
 	auto emu = Emu(uc);
 	uint64_t routine = emu->rcx();
-    uint64_t context = emu->rdx();
+	uint64_t context = emu->rdx();
 	emu->rip(routine);
 	Logger::Log(true, 12, " jmp to %llx\n", routine);
 
@@ -1544,7 +1557,7 @@ void Emulate::KdChangeOption(uc_engine* uc, uint64_t address, uint32_t size, voi
 	Logger::Log(true, ConsoleColor::RED, "KdChangeOption\n");
 	auto emu = Emu(uc);
 	emu->rax(0xC0000354);
-    RetHook(uc);
+	RetHook(uc);
 }
 
 void Emulate::MmIsAddressValid(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
@@ -1580,14 +1593,15 @@ void Emulate::RtlInitializeBitMap(uc_engine* uc, uint64_t address, uint32_t size
 	emu->write(bitmap_struct_addr, &RTL_BITMAP_STRUCT, sizeof(RTL_BITMAP_STRUCT));
 	Logger::Log(true, ConsoleColor::RED, "Bitmap initialized at 0x%llx Buffer address %llx\n", bitmap_struct_addr, bitmap_buffer_addr);
 
-	RetHook(uc);}
+	RetHook(uc);
+}
 
 void Emulate::RtlSetBits(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
 	Logger::Log(true, ConsoleColor::RED, "RtlSetBits\n");
 	auto emu = Emu(uc);
 	uint64_t bitmap_addr = emu->rcx();
-    uint64_t start_index = emu->rdx();
-    uint64_t bit_count = emu->r8();
+	uint64_t start_index = emu->rdx();
+	uint64_t bit_count = emu->r8();
 	if (bitmap_addr == 0 || bit_count == 0) {
 		std::cerr << "[-] RtlSetBits: Invalid parameters (null or zero count)" << std::endl;
 		RetHook(uc);
@@ -1662,12 +1676,12 @@ void Emulate::PsLookupProcessByProcessId(uc_engine* uc, uint64_t address, uint32
 		emu->rdx(base);
 		Logger::Log(true, 12, "PsLookupProcessByProcessId System 4\n");
 		uint64_t status = STATUS_SUCCESS;
-    	emu->rax(status);
+		emu->rax(status);
 		RetHook(uc);
 		return;
 	}
 	uint64_t status = 0xC000000D;
-    emu->rax(status);
+	emu->rax(status);
 	RetHook(uc);
 }
 
@@ -1685,9 +1699,9 @@ void Emulate::PsGetProcessImageFileName(uc_engine* uc, uint64_t address, uint32_
 	}
 
 	uint64_t image_name_addr = emu->read<uint64_t>(eprocess + 0x5a8);
-    char image_name[16] = { 0 };
-    emu->try_read(image_name_addr, image_name, sizeof(image_name));
-    emu->rax(image_name_addr);
+	char image_name[16] = { 0 };
+	emu->try_read(image_name_addr, image_name, sizeof(image_name));
+	emu->rax(image_name_addr);
 
 	Logger::Log(true, ConsoleColor::DARK_GREEN, "ImageFileName: %s\n", image_name);
 
@@ -1752,7 +1766,7 @@ void Emulate::IoCreateFileEx(uc_engine* uc, uint64_t address, uint32_t size, voi
 
 	DesiredAccess = emu->rdx();
 	uint32_t DesiredAccess32 = static_cast<uint32_t>(DesiredAccess);
-    ObjectAttributesAddr = emu->r8();
+	ObjectAttributesAddr = emu->r8();
 	OBJECT_ATTRIBUTES ObjectAttributes;
 	emu->try_read(ObjectAttributesAddr, &ObjectAttributes, sizeof(ObjectAttributes));
 	std::wstring file_name_str = read_unicode_string(uc, (uint64_t)ObjectAttributes.ObjectName);
@@ -1780,7 +1794,7 @@ void Emulate::IoCreateFileEx(uc_engine* uc, uint64_t address, uint32_t size, voi
 	IO_STATUS_BLOCK io_status = { 0 };
 	LARGE_INTEGER allocationSize;
 	allocationSize.QuadPart = 0;
-    HANDLE real_file_handle = nullptr;
+	HANDLE real_file_handle = nullptr;
 
 	std::wstring prefix = L"\\??\\";
 	std::wstring system32prefix = L"system32";
@@ -1816,9 +1830,9 @@ void Emulate::IoCreateFileEx(uc_engine* uc, uint64_t address, uint32_t size, voi
 	{
 		if (file_name_str.rfind(prefix, 0) == 0) {
 			file_name_str = file_name_str.substr(prefix.length());
-    	}
+		}
 		real_file_handle = CreateFile(
-			file_name_str.c_str(),			FILE_APPEND_DATA,			FILE_SHARE_READ | FILE_SHARE_WRITE,			NULL,			OPEN_ALWAYS,			FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH,			NULL		);
+			file_name_str.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, NULL);
 
 		if (real_file_handle == INVALID_HANDLE_VALUE) {
 			DWORD errorCode = GetLastError();
@@ -1860,7 +1874,7 @@ void Emulate::wcscat_s(uc_engine* uc, uint64_t address, uint32_t size, void* use
 	if (total_length * sizeof(wchar_t) > destsz) {
 		Logger::Log(true, ConsoleColor::DARK_GREEN, " wcscat_s: Target buffer too small! Need %d bytes, but only %d \n", total_length * sizeof(wchar_t), destsz);
 		uint64_t error_code = 22;
-    	emu->rax(error_code);
+		emu->rax(error_code);
 		return;
 	}
 
@@ -1891,10 +1905,10 @@ void Emulate::RtlMultiByteToUnicodeN(uc_engine* uc, uint64_t address, uint32_t s
 	Logger::Log(true, ConsoleColor::RED, "RtlMultiByteToUnicodeN\n");
 	auto emu = Emu(uc);
 	uint64_t unicode_str_ptr = emu->rcx();
-    uint64_t unicode_size = emu->rdx();
-    uint64_t result_size_ptr = emu->r8();
-    uint64_t multi_byte_str_ptr = emu->r9();
-    uint64_t rsp_value = emu->rsp();
+	uint64_t unicode_size = emu->rdx();
+	uint64_t result_size_ptr = emu->r8();
+	uint64_t multi_byte_str_ptr = emu->r9();
+	uint64_t rsp_value = emu->rsp();
 	uint64_t multi_byte_size_addr = rsp_value + 0x28;
 	uint32_t multi_byte_size = 0;
 	emu->try_read(multi_byte_size_addr, &multi_byte_size, sizeof(multi_byte_size));
@@ -1910,10 +1924,10 @@ void Emulate::RtlMultiByteToUnicodeN(uc_engine* uc, uint64_t address, uint32_t s
 	uint64_t unicode_length = unicode_str.size() + 1 * sizeof(wchar_t);
 
 	uint64_t status = 0;
-    if (unicode_length > unicode_size) {
+	if (unicode_length > unicode_size) {
 		unicode_length = unicode_size;
 		status = 0xC0000023;
-    }
+	}
 
 	Logger::Log(true, ConsoleColor::DARK_GREEN, "Before conversion (MultiByte): %s After conversion (Unicode): %s \n", multi_byte_str.data(), unicode_str.data());
 
@@ -1933,14 +1947,14 @@ void Emulate::RtlWriteRegistryValue(uc_engine* uc, uint64_t address, uint32_t si
 	Logger::Log(true, ConsoleColor::RED, "RtlWriteRegistryValue\n");
 	auto emu = Emu(uc);
 	uint64_t relativeTo = emu->rcx();
-    uint64_t pathAddr = emu->rdx();
-    uint64_t valueNameAddr = emu->r8();
-    uint64_t valueType = emu->r9();
+	uint64_t pathAddr = emu->rdx();
+	uint64_t valueNameAddr = emu->r8();
+	uint64_t valueType = emu->r9();
 	uint64_t stackPointer = emu->rsp();
 
 	uint64_t valueDataAddr = 0;
 	emu->try_read(stackPointer + 0x28, &valueDataAddr, sizeof(valueDataAddr));
-    uint64_t valueLength = 0;
+	uint64_t valueLength = 0;
 	emu->try_read(stackPointer + 0x30, &valueLength, sizeof(valueLength));
 	std::wstring wstr = read_unicode_string(uc, pathAddr);
 	std::string str;
@@ -1960,16 +1974,16 @@ void Emulate::RtlWriteRegistryValue(uc_engine* uc, uint64_t address, uint32_t si
 	Logger::Log(true, ConsoleColor::DARK_GREEN, " Path: %s ValueName : %s ValueType : %d ValueLength: %d \n", pathStr, valueNameStr, valueType, valueLength);
 
 	uint64_t status = 0;
-    emu->rax(status);
-    RetHook(uc);
+	emu->rax(status);
+	RetHook(uc);
 }
 
 void Emulate::RtlDeleteRegistryValue(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
 	Logger::Log(true, ConsoleColor::RED, "RtlDeleteRegistryValue\n");
 	auto emu = Emu(uc);
 	uint64_t relativeTo = emu->rcx();
-    uint64_t pathAddr = emu->rdx();
-    uint64_t valueNameAddr = emu->r8();
+	uint64_t pathAddr = emu->rdx();
+	uint64_t valueNameAddr = emu->r8();
 	std::wstring wstr = read_unicode_string(uc, pathAddr);
 	std::string str;
 	UnicodeToANSI(wstr, str);
@@ -1983,7 +1997,7 @@ void Emulate::RtlDeleteRegistryValue(uc_engine* uc, uint64_t address, uint32_t s
 
 	Logger::Log(true, ConsoleColor::DARK_GREEN, " Value :%llx not found in path \n ", str_valueNameAddr);
 	uint64_t status = 0xC0000034;
-    emu->rax(status);
+	emu->rax(status);
 	RetHook(uc);
 }
 
@@ -1991,13 +2005,13 @@ void Emulate::ZwOpenKey(uc_engine* uc, uint64_t address, uint32_t size, void* us
 	Logger::Log(true, ConsoleColor::RED, "ZwOpenKey\n");
 	auto emu = Emu(uc);
 	uint64_t keyHandleAddr = emu->rcx();
-    uint64_t desiredAccess = emu->rdx();
-    uint64_t objectAttributesAddr = emu->r8();
-    uint64_t rsp = emu->rsp();
+	uint64_t desiredAccess = emu->rdx();
+	uint64_t objectAttributesAddr = emu->r8();
+	uint64_t rsp = emu->rsp();
 
 	OBJECT_ATTRIBUTES ObjectAttributes;
 	emu->try_read(objectAttributesAddr, &ObjectAttributes, sizeof(ObjectAttributes));
-    std::wstring file_name_str = read_unicode_string(uc, ObjectAttributes.ObjectName);
+	std::wstring file_name_str = read_unicode_string(uc, ObjectAttributes.ObjectName);
 	std::string str;
 	UnicodeToANSI(file_name_str, str);
 
@@ -2022,12 +2036,12 @@ void Emulate::ZwQueryValueKey(uc_engine* uc, uint64_t address, uint32_t size, vo
 	Logger::Log(true, ConsoleColor::RED, "ZwQueryValueKey\n");
 	auto emu = Emu(uc);
 	uint64_t rcx = emu->rcx();
-    uint64_t rdx = emu->rdx();
-    uint64_t r8 = emu->r8();
-    uint64_t outBufPtr = emu->r9();
-    uint32_t bufLen = 0;
+	uint64_t rdx = emu->rdx();
+	uint64_t r8 = emu->r8();
+	uint64_t outBufPtr = emu->r9();
+	uint32_t bufLen = 0;
 	uint64_t rsp = emu->rsp();
-    emu->try_read(rsp + 0x28, &bufLen, sizeof(bufLen));
+	emu->try_read(rsp + 0x28, &bufLen, sizeof(bufLen));
 	uint64_t resultLenPtr = 0;
 	emu->try_read(rsp + 0x30, &resultLenPtr, sizeof(resultLenPtr));
 	if (rcx == 0 || resultLenPtr == 0) {
@@ -2069,7 +2083,7 @@ void Emulate::ZwQueryValueKey(uc_engine* uc, uint64_t address, uint32_t size, vo
 		uint64_t buffer_temp = Emulate::HeapAlloc(uc, 0x1000);
 		emu->write(buffer_temp, buffer.data(), buffer.size());
 		emu->r9(buffer_temp);
-    	emu->write(resultLenPtr, &resultLength, sizeof(ULONG));
+		emu->write(resultLenPtr, &resultLength, sizeof(ULONG));
 	}
 
 	emu->rax(status);
@@ -2080,11 +2094,11 @@ void Emulate::ZwCreateKey(uc_engine* uc, uint64_t address, uint32_t size, void* 
 	Logger::Log(true, ConsoleColor::RED, "ZwCreateKey\n");
 	auto emu = Emu(uc);
 	uint64_t rcx = emu->rcx();
-    uint64_t rdx = emu->rdx();
-    uint64_t r8 = emu->r8();
-    uint64_t r9 = emu->r9();
-    uint64_t r10 = emu->r10();
-    uint64_t r11 = emu->r11();
+	uint64_t rdx = emu->rdx();
+	uint64_t r8 = emu->r8();
+	uint64_t r9 = emu->r9();
+	uint64_t r10 = emu->r10();
+	uint64_t r11 = emu->r11();
 	if (r8 == 0) {
 		Logger::Log(true, ConsoleColor::DARK_GREEN, "Invalid ObjectAttributes \n");
 		NTSTATUS status = STATUS_INVALID_PARAMETER;
@@ -2095,7 +2109,7 @@ void Emulate::ZwCreateKey(uc_engine* uc, uint64_t address, uint32_t size, void* 
 
 	OBJECT_ATTRIBUTES ObjectAttributes;
 	emu->try_read(r8, &ObjectAttributes, sizeof(ObjectAttributes));
-    std::wstring file_name_str = read_unicode_string(uc, (uint64_t)ObjectAttributes.ObjectName);
+	std::wstring file_name_str = read_unicode_string(uc, (uint64_t)ObjectAttributes.ObjectName);
 
 	std::string str;
 	UnicodeToANSI(file_name_str, str);
@@ -2154,14 +2168,14 @@ void Emulate::ZwSetValueKey(uc_engine* uc, uint64_t address, uint32_t size, void
 		static_cast<ULONG>(dataSize)
 	);
 	uint64_t status = ret;
-    emu->rax(status);
+	emu->rax(status);
 	RetHook(uc);
 }
 void Emulate::ZwDeleteValueKey(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
 	Logger::Log(true, ConsoleColor::RED, "ZwDeleteValueKey\n");
 	auto emu = Emu(uc);
 	uint64_t KeyHandle = emu->rcx();
-    uint64_t ValueNamePtr = emu->rdx();
+	uint64_t ValueNamePtr = emu->rdx();
 	std::wstring value_name = read_unicode_string(uc, ValueNamePtr);
 
 
@@ -2171,7 +2185,7 @@ void Emulate::ZwDeleteValueKey(uc_engine* uc, uint64_t address, uint32_t size, v
 		if (entry.second == KeyHandle) {
 			found_key = entry.first;
 			break;
-    	}
+		}
 	}
 	std::wstring key_name;
 	ANSIToUnicode(found_key, key_name);
@@ -2185,12 +2199,12 @@ void Emulate::ZwDeleteValueKey(uc_engine* uc, uint64_t address, uint32_t size, v
 void Emulate::RtlRandomEx(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
 	auto emu = Emu(uc);
 	uint64_t seed_ptr;
-    uint64_t rip;
-    uint32_t seed_value;
-    uint32_t random_value;
+	uint64_t rip;
+	uint32_t seed_value;
+	uint32_t random_value;
 	seed_ptr = emu->rcx();
-    rip = emu->rip();
-    emu->try_read(seed_ptr, &seed_value, sizeof(seed_value));
+	rip = emu->rip();
+	emu->try_read(seed_ptr, &seed_value, sizeof(seed_value));
 
 	seed_value = seed_value * 214013 + 2531011;
 	random_value = (seed_value >> 16) & 0x7FFFFFFF;
@@ -2206,7 +2220,7 @@ void Emulate::KeAreAllApcsDisabled(uc_engine* uc, uint64_t address, uint32_t siz
 	Logger::Log(true, ConsoleColor::RED, "KeAreAllApcsDisabled\n");
 	return;
 	uint64_t status = 0;
-    auto emu = Emu(uc);
+	auto emu = Emu(uc);
 	emu->rax(status);
 	RetHook(uc);
 }
@@ -2285,7 +2299,7 @@ void Emulate::ZwCreateFile(uc_engine* uc, uint64_t address, uint32_t size, void*
 
 	DesiredAccess = emu->rdx();
 	uint32_t DesiredAccess32 = static_cast<uint32_t>(DesiredAccess);
-    ObjectAttributesAddr = emu->r8();
+	ObjectAttributesAddr = emu->r8();
 	OBJECT_ATTRIBUTES ObjectAttributes;
 	emu->try_read(ObjectAttributesAddr, &ObjectAttributes, sizeof(ObjectAttributes));
 	std::wstring file_name_str = read_unicode_string(uc, (uint64_t)ObjectAttributes.ObjectName);
@@ -2313,7 +2327,7 @@ void Emulate::ZwCreateFile(uc_engine* uc, uint64_t address, uint32_t size, void*
 	IO_STATUS_BLOCK io_status = { 0 };
 	LARGE_INTEGER allocationSize;
 	allocationSize.QuadPart = 0;
-    uint32_t ret = 0;
+	uint32_t ret = 0;
 	HANDLE real_file_handle = nullptr;
 
 
@@ -2364,7 +2378,7 @@ void Emulate::ZwWriteFile(uc_engine* uc, uint64_t address, uint32_t size, void* 
 	if (file_handle == 0) {
 		Logger::Log(true, ConsoleColor::DARK_GREEN, "Invalid file handle\n");
 		uint64_t status_invalid = 0xC0000008;
-    	emu->rax(status_invalid);
+		emu->rax(status_invalid);
 		RetHook(uc);
 		return;
 	}
@@ -2372,7 +2386,7 @@ void Emulate::ZwWriteFile(uc_engine* uc, uint64_t address, uint32_t size, void* 
 	if (length == 0) {
 		Logger::Log(true, ConsoleColor::DARK_GREEN, "Write length is 0, no operation\n");
 		uint64_t status_success = 0x0;
-    	emu->rax(status_success);
+		emu->rax(status_success);
 		RetHook(uc);
 		return;
 	}
@@ -2381,7 +2395,7 @@ void Emulate::ZwWriteFile(uc_engine* uc, uint64_t address, uint32_t size, void* 
 	if (!emu->try_read(buffer_addr, buffer.data(), length)) {
 		Logger::Log(true, ConsoleColor::DARK_GREEN, "Unable to read buffer\n");
 		uint64_t status_access_violation = 0xC0000005;
-    	emu->rax(status_access_violation);
+		emu->rax(status_access_violation);
 		RetHook(uc);
 		return;
 	}
@@ -2394,7 +2408,7 @@ void Emulate::ZwWriteFile(uc_engine* uc, uint64_t address, uint32_t size, void* 
 		buffer.data(),
 		buffer.size(),
 		&bytesWritten,
-		NULL	);
+		NULL);
 
 	if (!writeSuccess) {
 		std::cerr << "WriteFile failed, error code: " << GetLastError() << std::endl;
@@ -2427,7 +2441,6 @@ void Emulate::ZwFlushBuffersFile(uc_engine* uc, uint64_t address, uint32_t size,
 			if (loader->errorevent != nullptr && loader->errorevent != ti->Event)
 			{
 				WaitForSingleObject(loader->errorevent, INFINITE);
-				Sleep(1);
 			}
 			loader->errorevent = ti->Event;
 			Sleep(1);
@@ -2486,7 +2499,8 @@ void Emulate::ZwQueryInformationFile(uc_engine* uc) {
 	PEloader* loader = &PEloader::GetInstance();
 	auto it = loader->handle_table.find(FileHandle);
 
-	if (FileInformationClass == 5) {		FILE_STANDARD_INFORMATION _FileInformation = { sizeof(FILE_STANDARD_INFORMATION),0 };
+	if (FileInformationClass == 5) {
+		FILE_STANDARD_INFORMATION _FileInformation = { sizeof(FILE_STANDARD_INFORMATION),0 };
 		auto ret = __NtRoutine("NtQueryInformationFile", FileHandle, &_IoStatusBlock, &_FileInformation, sizeof(_FileInformation), FileInformationClass);
 		if (Length >= sizeof(FILE_STANDARD_INFORMATION)) {
 			emu->write(FileInformation, &_FileInformation, sizeof(_FileInformation));
@@ -2566,7 +2580,7 @@ void Emulate::ZwReadFile(uc_engine* uc, uint64_t address, uint32_t size, void* u
 	emu->try_read(rsp + 0x30, &Length, sizeof(uint32_t));
 	emu->try_read(rsp + 0x38, &ByteOffsetAddr, sizeof(uint64_t));
 	emu->try_read(rsp + 0x40, &Key, sizeof(uint64_t));
-    LARGE_INTEGER ByteOffset = {};
+	LARGE_INTEGER ByteOffset = {};
 	emu->try_read(ByteOffsetAddr, &ByteOffset, sizeof(LARGE_INTEGER));
 	if (Length < 1)
 		Length = static_cast<uint32_t>(emu->r13());
@@ -2616,9 +2630,9 @@ void Emulate::NtQuerySystemInformation(uc_engine* uc, uint64_t address, uint32_t
 void Emulate::IoWMIOpenBlock(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
 	auto emu = Emu(uc);
 	uint64_t rcx = emu->rcx();
-    uint64_t rdx = emu->rdx();
-    uint64_t r8 = emu->r8();
-    (void)rdx;
+	uint64_t rdx = emu->rdx();
+	uint64_t r8 = emu->r8();
+	(void)rdx;
 
 	uint8_t read_guid[16] = {};
 	emu->try_read(rcx, read_guid, sizeof(read_guid));
@@ -2630,7 +2644,7 @@ void Emulate::IoWMIOpenBlock(uc_engine* uc, uint64_t address, uint32_t size, voi
 		status = STATUS_SUCCESS;
 
 		uint32_t fake_wmi_obj = 0xDEADBEEF;
-    	emu->write(r8, &fake_wmi_obj, sizeof(fake_wmi_obj));
+		emu->write(r8, &fake_wmi_obj, sizeof(fake_wmi_obj));
 	}
 	else {
 		Logger::Log(true, ConsoleColor::GREEN, "IoWMIOpenBlock Failed\n");
@@ -2642,9 +2656,9 @@ void Emulate::IoWMIOpenBlock(uc_engine* uc, uint64_t address, uint32_t size, voi
 void Emulate::IoWMIQueryAllData(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
 	auto emu = Emu(uc);
 	uint64_t rcx = emu->rcx();
-    uint64_t rdx = emu->rdx();
-    uint64_t r8 = emu->r8();
-    (void)rdx;
+	uint64_t rdx = emu->rdx();
+	uint64_t r8 = emu->r8();
+	(void)rdx;
 
 	uint32_t handle_value = 0;
 	emu->try_read(rcx, &handle_value, sizeof(handle_value));
@@ -2656,7 +2670,7 @@ void Emulate::IoWMIQueryAllData(uc_engine* uc, uint64_t address, uint32_t size, 
 
 		uint8_t fake_wmi_data[0x100] = { 0 };
 		*(uint32_t*)&fake_wmi_data[0] = 0x100;
-    	*(uint32_t*)&fake_wmi_data[4] = 0xDEADBEEF;
+		*(uint32_t*)&fake_wmi_data[4] = 0xDEADBEEF;
 		emu->write(r8, fake_wmi_data, sizeof(fake_wmi_data));
 
 		status = STATUS_SUCCESS;
@@ -2709,7 +2723,7 @@ void Emulate::KeInitializeEvent(uc_engine* uc, uint64_t address, uint32_t size, 
 	Logger::Log(true, 8, "Type: %s\n", (type == 0 ? "NotificationEvent" : "SynchronizationEvent"));
 	Logger::Log(true, 8, "Initial State: %s\n", (state ? "Signaled" : "Non-Signaled"));
 	HANDLE event = CreateEvent(NULL, type == 0, state != 0, NULL);
-
+	Logger::Log(true, 8, "Handle: %x\n", event);
 
 	if (event_ptr == 0) return;
 
@@ -2722,7 +2736,7 @@ void Emulate::KeInitializeEvent(uc_engine* uc, uint64_t address, uint32_t size, 
 	} header = { 0 };
 
 	header.Type = (uint8_t)type;
-    header.Absolute = 0;
+	header.Absolute = 0;
 	header.Size = sizeof(header) / sizeof(ULONG_PTR);
 	header.Inserted = 0;
 	header.SignalState = (state ? 1 : 0);
@@ -2748,7 +2762,7 @@ void Emulate::TrampolineThread(ThreadInfo_t* ti) {
 
 	}
 	uc_engine* uc = loader->uc;
-	
+
 	uc_open(UC_ARCH_X86, UC_MODE_64, &ti->tuc);
 	uc_mem_region* regions;
 	uint32_t count;
@@ -2758,30 +2772,24 @@ void Emulate::TrampolineThread(ThreadInfo_t* ti) {
 	auto emu = Emu(uc);
 	auto threadEmu = Emu(ti->tuc);
 	uc_hook trace, traces, trace_mem, trace_nt, t;
-	bool KdDebuggerNotPresent = 1;
-	bool KdDebuggerEnabled = 0;
+
 	for (auto& peFile : loader->peFiles)
 	{
+		uint64_t size = loader->real_mem_map[peFile->Base].second;
+		uc_err err = uc_mem_map_ptr(ti->tuc, peFile->Base, peFile->End - peFile->Base, UC_PROT_ALL, loader->real_mem_map[peFile->Base].first);
 
-		if (peFile->FileName == "ntoskrnl.exe")
-		{
-			uint64_t size = loader->real_mem_map[peFile->Base].second;
-			uc_err err = uc_mem_map_ptr(ti->tuc, peFile->Base, peFile->End - peFile->Base, UC_PROT_ALL, loader->real_mem_map[peFile->Base].first);
-			uint64_t KdDebuggerNotPresentaddress = peFile->Base + peFile->FuncAddr["KdDebuggerNotPresent"];
-			uint64_t KdDebuggerEnabledaddress = peFile->Base + peFile->FuncAddr["KdDebuggerEnabled"];
-			loader->RtlRaiseStatusBase = peFile->Base + peFile->FuncAddr["RtlRaiseStatus"];
-			threadEmu->write(KdDebuggerNotPresentaddress, &KdDebuggerNotPresent, sizeof(KdDebuggerNotPresent));
-			threadEmu->write(KdDebuggerEnabledaddress, &KdDebuggerEnabled, sizeof(KdDebuggerEnabled));
-		}
 	}
 
-	uc_err errU = uc_hook_add(ti->tuc, &trace_mem, UC_HOOK_MEM_INVALID, (void*)Unicorn::hook_mem_invalid, NULL, 1, 0);
-	errU = uc_hook_add(ti->tuc, &trace_mem, UC_HOOK_INSN_INVALID, (void*)Unicorn::hook_mem_invalid, NULL, 1, 0);
+	uc_err errU = uc_hook_add(ti->tuc, &trace_mem, UC_HOOK_MEM_INVALID, (void*)Unicorn::hook_mem_invalid, ti, 1, 0);
+	errU = uc_hook_add(ti->tuc, &trace_mem, UC_HOOK_INSN_INVALID, (void*)Unicorn::hook_mem_invalid, ti, 1, 0);
 	errU = uc_hook_add(ti->tuc, &intr_hook, UC_HOOK_INTR, (void*)Unicorn::catch_error, nullptr, 1, 0);
-	uc_hook_add(ti->tuc, &t, UC_HOOK_CODE, Unicorn::register_hook, NULL, loader->peFiles[0]->Base, loader->peFiles[0]->End);
+
+	//uc_hook_add(ti->tuc, &t, UC_HOOK_CODE, Unicorn::register_hook, NULL, loader->peFiles[0]->Base, loader->peFiles[0]->End);
 	Unicorn _uc{};
+	auto exports = g_Debugger->ListAllFunctionsByDbgEng("ntoskrnl.exe");
+
 	for (const auto& pair : _uc.NtfuncMap) {
-		_uc.hook_File_func(ti->tuc, "t", pair.first, pair.second);
+		_uc.hook_Symbol_func(ti->tuc, exports, ti, pair.first, pair.second);
 	}
 	for (const auto& pair : _uc.CngFuncMap) {
 		_uc.hook_File_func(ti->tuc, "t", pair.first, pair.second);
@@ -2792,7 +2800,7 @@ void Emulate::TrampolineThread(ThreadInfo_t* ti) {
 	for (auto object : loader->objectList) {
 		// MOD_TEST
 		//uc_hook_add(ti->tuc, &t, UC_HOOK_MEM_READ | UC_HOOK_MEM_WRITE, (void*)Unicorn::hook_access_object, (void*)object, object->address, object->address + object->size);
-		uc_hook_add(ti->tuc, &t, UC_HOOK_MEM_READ | UC_HOOK_MEM_WRITE, (void*)Unicorn::hook_access_object, (void*)object.get(), object->address, object->address + object->size);
+		uc_hook_add(ti->tuc, &t, UC_HOOK_MEM_READ, (void*)Unicorn::hook_access_object, (void*)object.get(), object->address, object->address + object->size);
 	}
 
 
@@ -2852,7 +2860,7 @@ void Emulate::PsCreateSystemThread(uc_engine* uc, uint64_t address, uint32_t siz
 	uint64_t rsp = emu->rsp();
 	uint64_t clientId = 0;
 	uint64_t startRoutine = 0;
-	uint64_t startContext =0;
+	uint64_t startContext = 0;
 	emu->try_read(rsp + 0x28, &clientId, sizeof(clientId));
 	emu->try_read(rsp + 0x30, &startRoutine, sizeof(startRoutine));
 	emu->try_read(rsp + 0x38, &startContext, sizeof(startContext));
@@ -2874,12 +2882,11 @@ void Emulate::PsCreateSystemThread(uc_engine* uc, uint64_t address, uint32_t siz
 	uc_context_save(uc, ti->uc_ctx);
 
 	HANDLE thread = CreateThread(nullptr, 8192, (LPTHREAD_START_ROUTINE)TrampolineThread, ti, 0, nullptr);
-	
+
 	ti->handle = thread;
 
 	loader->Threads.push_back(ti);
 	loader->waitHandles.push_back(ti->Event);
-
 
 
 	WaitForSingleObject(ti->Event, INFINITE);
@@ -2891,9 +2898,9 @@ void Emulate::PsCreateSystemThread(uc_engine* uc, uint64_t address, uint32_t siz
 void Emulate::KeSetEvent(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
 	auto emu = Emu(uc);
 	uint64_t rcx = emu->rcx();
-    uint64_t rdx = emu->rdx();
-    uint64_t r8 = emu->r8();
-    UNREFERENCED_PARAMETER(rdx);
+	uint64_t rdx = emu->rdx();
+	uint64_t r8 = emu->r8();
+	UNREFERENCED_PARAMETER(rdx);
 	UNREFERENCED_PARAMETER(r8);
 	Logger::Log(true, ConsoleColor::RED, "KeSetEvent\n");
 	HANDLE handle = nullptr;
@@ -2932,29 +2939,29 @@ void Emulate::KeCapturePersistentThreadState(uc_engine* uc, uint64_t address, ui
 void Emulate::ZwOpenDirectoryObject(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
 	auto emu = Emu(uc);
 	uint64_t rcx = emu->rcx();
-    uint64_t rdx = emu->rdx();
-    uint64_t r8 = emu->r8();
-    
+	uint64_t rdx = emu->rdx();
+	uint64_t r8 = emu->r8();
+
 	Logger::Log(true, ConsoleColor::RED, "ZwOpenDirectoryObject\n");
 
-	Logger::Log(true, ConsoleColor::RED, "DirectoryHandle: 0x%llx\n    DirectoryHandle address: %llx\n    DesiredAccess: %d    ObjectAttributes pointer: %llx\n", rcx, rdx, r8);
+	Logger::Log(true, ConsoleColor::RED, "DirectoryHandle: 0x%llx\n    DirectoryHandle address: %llx\n    DesiredAccess: %x    ObjectAttributes pointer: %llx\n", rcx, rdx, r8);
 	OBJECT_ATTRIBUTES ObjectAttributes;
 	emu->try_read(r8, &ObjectAttributes, sizeof(ObjectAttributes));
-    
+
 	std::wstring file_name_str = read_unicode_string(uc, ObjectAttributes.ObjectName);
 	std::wcout << "Directory name: " << file_name_str << std::endl;
 
 	uint64_t status = STATUS_OBJECT_NAME_NOT_FOUND;
-	uint32_t fake_handle = 0xBADF00D;
-    
-	if (file_name_str == L"\\" || file_name_str == L"\\Device" || file_name_str == L"\\KnownDlls") {
-		status = STATUS_SUCCESS;
-		emu->write(rcx, &fake_handle, sizeof(fake_handle));
-    	Logger::Log(true, ConsoleColor::RED, "Exist, Return Fake Handle: 0xBADF00D\n");
-	}
-	else {
-		Logger::Log(true, ConsoleColor::DARK_GREEN, "Path does not exist, return STATUS_OBJECT_NAME_NOT_FOUND");
-	}
+	//uint32_t fake_handle = 0xBADF00D;
+
+	//if (file_name_str == L"\\" || file_name_str == L"\\Device" || file_name_str == L"\\KnownDlls") {
+	//	status = STATUS_SUCCESS;
+	//	emu->write(rcx, &fake_handle, sizeof(fake_handle));
+	//	Logger::Log(true, ConsoleColor::RED, "Exist, Return Fake Handle: 0xBADF00D\n");
+	//}
+	//else {
+	//	Logger::Log(true, ConsoleColor::DARK_GREEN, "Path does not exist, return STATUS_OBJECT_NAME_NOT_FOUND");
+	//}
 
 	emu->rax(status);
 
@@ -2963,9 +2970,9 @@ void Emulate::ZwOpenDirectoryObject(uc_engine* uc, uint64_t address, uint32_t si
 void Emulate::ObReferenceObjectByHandle(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
 	auto emu = Emu(uc);
 	uint64_t rcx = emu->rcx();
-    uint64_t rdx = emu->rdx();
-    uint64_t r8 = emu->r8();
-    UNREFERENCED_PARAMETER(rdx);
+	uint64_t rdx = emu->rdx();
+	uint64_t r8 = emu->r8();
+	UNREFERENCED_PARAMETER(rdx);
 	UNREFERENCED_PARAMETER(r8);
 	Logger::Log(true, ConsoleColor::RED, "ObReferenceObjectByHandle\n");
 
@@ -2975,7 +2982,7 @@ void Emulate::ObReferenceObjectByHandle(uc_engine* uc, uint64_t address, uint32_
 
 	status = 0;
 	emu->rax(status);
-    RetHook(uc);
+	RetHook(uc);
 }
 void Emulate::NtClose(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
 	auto emu = Emu(uc);
@@ -2988,7 +2995,7 @@ void Emulate::NtClose(uc_engine* uc, uint64_t address, uint32_t size, void* user
 
 void Emulate::ExAcquireFastMutex(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
 	auto emu = Emu(uc);
-	uint64_t rcx = emu->rcx(); 
+	uint64_t rcx = emu->rcx();
 	Logger::Log(true, ConsoleColor::RED, "ExAcquireFastMutex\n");
 	if (rcx == 0) {
 		Logger::Log(true, ConsoleColor::DARK_GREEN, "NULL\n");
@@ -3028,7 +3035,7 @@ void Emulate::KeReleaseGuardedMutex(uc_engine* uc, uint64_t address, uint32_t si
 	emu->try_read(rcx, &count, sizeof(count));
 	emu->try_read(rcx + 8, &ownerThread, sizeof(ownerThread));
 	uint64_t currentThread = 0xDEADBEEF;
-    if (ownerThread != currentThread) {
+	if (ownerThread != currentThread) {
 		std::cerr << "[-] KeReleaseGuardedMutex: Attempting to release GuardedMutex of non-current thread, may cause BSOD!" << std::endl;
 		RetHook(uc);
 		return;
@@ -3069,9 +3076,10 @@ void Emulate::KeWaitForSingleObject(uc_engine* uc, uint64_t address, uint32_t si
 	uint64_t rsp = emu->rsp();
 	uint64_t timeout = 0;
 	emu->try_read(rsp + 0x28, &timeout, sizeof(timeout));
-	
+
 	HANDLE handle = nullptr;
 	emu->try_read(rcx, &handle, sizeof(handle));
+	Logger::Log(true, ConsoleColor::YELLOW, "Handle : %x \n", handle);
 	WaitForSingleObject((HANDLE)handle, INFINITE);
 
 	uint64_t status = STATUS_SUCCESS;
@@ -3135,7 +3143,7 @@ void Emulate::RtlGetVersion(uc_engine* uc, uint64_t address, uint32_t size, void
 	wcscpy_s(version_info.szCSDVersion, L"Service Pack 1");
 	emu->write(rcx, &version_info, sizeof(version_info));
 	uint64_t status = STATUS_SUCCESS;
-	emu->rax(status); 
+	emu->rax(status);
 
 	Logger::Log(true, ConsoleColor::DARK_GREEN, "RtlGetVersion\n");
 	RetHook(uc);
@@ -3152,7 +3160,7 @@ void Emulate::KeDelayExecutionThread(uc_engine* uc, uint64_t address, uint32_t s
 
 	int64_t delay_ms = -(interval / 10000);
 	if (delay_ms < 0) delay_ms = 0;
-    int thread = loader->Threads.size();
+	int thread = loader->Threads.size();
 
 	Sleep(delay_ms);
 
@@ -3274,6 +3282,141 @@ void Emulate::IoDeleteSymbolicLink(uc_engine* uc, uint64_t address, uint32_t siz
 	}
 
 	emu->rax(status);
+	RetHook(uc);
+}
+
+void Emulate::IoGetRelatedDeviceObject(uc_engine* uc, uint64_t address, uint32_t size, void* user_data)
+{
+	Logger::Log(true, ConsoleColor::RED, "IoGetRelatedDeviceObject\n");
+	constexpr uint32_t DEVICE_OBJECT_AttachedDevice = 0x18;
+	constexpr uint32_t FILE_OBJECT_DeviceObject = 0x08;
+	auto emu = Emu(uc);
+
+	// RCX = PFILE_OBJECT
+	uint64_t fileObjectAddr = emu->rcx();
+	Logger::Log(true, ConsoleColor::DARK_GREEN,
+		"  FileObject @ 0x%llx\n", fileObjectAddr);
+
+	uc_err err;
+	uint64_t resultDevice = 0;  // 最後要回傳的 PDEVICE_OBJECT
+
+	if (fileObjectAddr == 0) {
+		Logger::Log(true, ConsoleColor::YELLOW,
+			"  [WARN] FileObject is NULL, returning NULL\n");
+		RetHook(uc);
+		return;
+	}
+
+	// ==== 1. 讀 FILE_OBJECT->DeviceObject ====
+	uint64_t deviceObject = 0;
+	err = uc_mem_read(uc,
+		fileObjectAddr + FILE_OBJECT_DeviceObject,
+		&deviceObject,
+		sizeof(deviceObject));
+	if (err != UC_ERR_OK) {
+		Logger::Log(true, ConsoleColor::YELLOW,
+			"  [WARN] uc_mem_read DeviceObject failed: %d\n", err);
+		RetHook(uc);
+		return;
+	}
+
+	if (deviceObject == 0) {
+		Logger::Log(true, ConsoleColor::YELLOW,
+			"  [WARN] FileObject->DeviceObject is NULL, returning NULL\n");
+		RetHook(uc);
+		return;
+	}
+
+	Logger::Log(true, ConsoleColor::DARK_GREEN,
+		"  Base DeviceObject @ 0x%llx\n", deviceObject);
+
+	// ==== 2. 沿著 AttachedDevice 一路往上找 ====
+	resultDevice = deviceObject;
+
+	// 防禦：避免壞鏈結造成無限 loop，設個上限
+	const int MAX_STACK_DEPTH = 32;
+	int depth = 0;
+
+	while (depth < MAX_STACK_DEPTH) {
+		uint64_t attached = 0;
+		err = uc_mem_read(uc,
+			resultDevice + DEVICE_OBJECT_AttachedDevice,
+			&attached,
+			sizeof(attached));
+		if (err != UC_ERR_OK) {
+			Logger::Log(true, ConsoleColor::YELLOW,
+				"  [WARN] uc_mem_read AttachedDevice failed at depth %d: %d\n",
+				depth, err);
+			break;
+		}
+
+		if (attached == 0) {
+			// 沒有再 attached 更高層 → resultDevice 就是最上層
+			break;
+		}
+
+		Logger::Log(true, ConsoleColor::DARK_GREEN,
+			"  depth %d: AttachedDevice @ 0x%llx\n", depth, attached);
+
+		resultDevice = attached;
+		++depth;
+	}
+
+	if (depth >= MAX_STACK_DEPTH) {
+		Logger::Log(true, ConsoleColor::YELLOW,
+			"  [WARN] AttachedDevice chain too deep, stopped at depth %d\n", depth);
+	}
+
+	// ==== 3. 設定回傳值到 RAX ====
+
+	uint64_t rax = resultDevice;
+	emu->rax(resultDevice);
+	Logger::Log(true, ConsoleColor::DARK_GREEN,
+		"  Return DeviceObject = 0x%llx\n", resultDevice);
+
+
+	RetHook(uc);
+}
+
+void Emulate::IoBuildDeviceIoControlRequest(uc_engine* uc, uint64_t address, uint32_t size, void* user_data)
+{
+	auto emu = Emu(uc);
+
+	uint64_t IoControlCode = emu->rcx();
+	uint64_t DeviceObject = emu->rdx();
+	uint64_t InputBuffer = emu->r8();
+	uint64_t InputLength = emu->r9();
+
+	// 其餘參數在 stack 上 (OutputBuffer, OutputLength, Internal, Event, IoStatusBlock)
+	// 你可以視需求從 RSP + 0x28 開始往上讀
+
+	Logger::Log(true, ConsoleColor::RED,
+		"IoBuildDeviceIoControlRequest: IOCTL=0x%08llX DO=0x%llx InLen=%llu\n",
+		IoControlCode, DeviceObject, InputLength);
+
+	// 簡單版：完全不支援 → 回傳 NULL
+	uint64_t rax = 0; // PIRP
+	emu->rax(rax);
+
+
+	RetHook(uc);
+}
+
+void Emulate::KiDeliverApc(uc_engine* uc, uint64_t address, uint32_t size, void* user_data)
+{
+	auto emu = Emu(uc);
+
+	// 其餘參數在 stack 上 (OutputBuffer, OutputLength, Internal, Event, IoStatusBlock)
+	// 你可以視需求從 RSP + 0x28 開始往上讀
+
+	Logger::Log(true, ConsoleColor::RED,
+		"KiDeliverApc \n");
+
+	// 簡單版：完全不支援 → 回傳 NULL
+	uint64_t rax = 0; // PIRP
+	emu->rax(rax);
+
+
 	RetHook(uc);
 }
 
@@ -3428,7 +3571,7 @@ void Emulate::BCryptGetProperty(uc_engine* uc, uint64_t address, uint32_t size, 
 	uint64_t rsp = emu->rsp();
 	rsp = rsp + 8;
 	emu->try_read(rsp + 0x20, &pcbResult, sizeof(uint64_t));
-    emu->try_read(rsp + 0x28, &dwFlags, sizeof(uint64_t));
+	emu->try_read(rsp + 0x28, &dwFlags, sizeof(uint64_t));
 
 	std::wstring suckmyname = read_unicode_string(uc, pszProp);
 	std::wstring propName;
@@ -3461,10 +3604,10 @@ void Emulate::BCryptGetProperty(uc_engine* uc, uint64_t address, uint32_t size, 
 void Emulate::BCryptFinishHash(uc_engine* uc, uint64_t address, uint32_t size, void* user_data) {
 	auto emu = Emu(uc);
 	uint64_t hFakeHash = emu->rcx();
-    uint64_t pbOutput = emu->rdx();
-    uint64_t cbOutput = emu->r8();
-    uint64_t dwFlags = emu->r9();
-    Logger::Log(true, ConsoleColor::RED, "BCryptFinishHash\n");
+	uint64_t pbOutput = emu->rdx();
+	uint64_t cbOutput = emu->r8();
+	uint64_t dwFlags = emu->r9();
+	Logger::Log(true, ConsoleColor::RED, "BCryptFinishHash\n");
 	auto it = g_HashHandleMap.find(hFakeHash);
 	if (it == g_HashHandleMap.end()) {
 		std::cerr << "[-] Unknown Hash Handle: 0x" << std::hex << hFakeHash << std::endl;
@@ -3501,7 +3644,7 @@ void Emulate::BCryptDestroyHash(uc_engine* uc, uint64_t address, uint32_t size, 
 	Logger::Log(true, ConsoleColor::RED, "BCryptDestroyHash\n");
 	Logger::Log(true, ConsoleColor::DARK_GREEN, " Destroy Hash Handle = 0x%llx\n", hashHandle);
 	uint8_t zero[0x100] = {};
-    g_HashHandleMap.erase(hashHandle);
+	g_HashHandleMap.erase(hashHandle);
 
 	uint64_t status = 0;
 	emu->rax(status);
