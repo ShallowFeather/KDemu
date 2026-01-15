@@ -982,7 +982,7 @@ public:
 	}
 
 	UnicornEmu& gdtr(uint64_t base, uint32_t limit) {
-		uc_x86_mmr mmr = { base, limit, 0, 0 };
+		uc_x86_mmr mmr = { 0, base, limit, 0 };
 		uc_reg_write(uc_, UC_X86_REG_GDTR, &mmr);
 		return *this;
 	}
@@ -995,7 +995,7 @@ public:
 	}
 
 	UnicornEmu& idtr(uint64_t base, uint32_t limit) {
-		uc_x86_mmr mmr = { base, limit, 0, 0 };
+		uc_x86_mmr mmr = { 0, base, limit, 0 };
 		uc_reg_write(uc_, UC_X86_REG_IDTR, &mmr);
 		return *this;
 	}
