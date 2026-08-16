@@ -68,7 +68,7 @@ void mainThread() {
 	{
 		vgk += "\\vgk_new.sys";
 		//vgk += "\\EasyAntiCheat_26aa6eb638137d17330be2df98352115.sys";
-		Logger::Log(true, ConsoleColor::DARK_GREEN, "Full path: %s \n", ntoskrnl2);
+		Logger::Log(true, ConsoleColor::DARK_GREEN, "Full path: %s \n", ntoskrnl2.c_str());
 	}
 	else {
 		std::cerr << "Error getting current directory" << std::endl;
@@ -155,7 +155,8 @@ void mainThread() {
 		}
 		printf("ExecuteFromRip %llx\n", peLoader.ExecuteFromRip);
 	}
-	Logger::Log(true, ConsoleColor::DARK_GREEN, "Main thread exited\n");
+
+	Logger::Log(true, ConsoleColor::DARK_GREEN, "Main thread exited ( Code: 0x%llx )\n", Emu(uc)->rax());
 	DWORD exitCode = 0;
 	while (true) {
 		for (auto i : peLoader.Threads) {

@@ -16,6 +16,31 @@ private:
 public:
 	explicit UnicornEmu(uc_engine* uc) : uc_(uc) {}
 
+	// fetch function argument, can be used when entering a function
+	uint64_t getArg(uint32_t index) const {
+		switch (index) {
+		case 0:
+			return rcx();
+		case 1:
+			return rdx();
+		case 2:
+			return r8();
+		case 3:
+			return r9();
+		default:
+			return read<uint64_t>(rsp() + (8 + (index * 8)));
+		}
+	}
+
+	void retFromFunction(uint64_t retval) {
+		rax(retval);
+		RetHook(uc_);
+	}
+
+	void retFromFunction() {
+		RetHook(uc_);
+	}
+
 	UnicornEmu& rip(uint64_t value) {
 		uc_reg_write(uc_, UC_X86_REG_RIP, &value);
 		return *this;
@@ -359,6 +384,33 @@ public:
 		return data;
 	}
 
+	// Read null terminated wide string from guest virtual address
+	std::wstring read_wstring(uint64_t buffer_start) const {
+		std::wstring result;
+		
+		for (uint64_t addr = buffer_start;; addr += sizeof(wchar_t)) {
+			wchar_t ch = 0;
+			if (!try_read(addr, &ch, sizeof(ch))) {
+				break;
+			}
+			result.push_back(ch);
+			if (ch == L'\0') break;
+		}
+
+		return result;
+	}
+
+	// Read null terminated string from guest virtual address
+	std::string read_string(uint64_t pbuffer) const {
+		std::string s;
+		char ch;
+		do {
+			ch = static_cast<char>(read<uint8_t>(pbuffer++));
+			s.push_back(ch);
+		} while (ch != '\0');
+		return s;
+	}
+
 	bool try_read(uint64_t addr, void* buffer, size_t size) const {
 		return uc_mem_read(uc_, addr, buffer, size) == UC_ERR_OK;
 	}
@@ -498,7 +550,8 @@ public:
 		}
 
 		if (show) {
-			Logger::Log(true, ConsoleColor::DARK_YELLOW, "Memory address: %llx size: %llx\n", address, static_cast<uint64_t>(allocSize));
+			// NEW_MOD_TEST
+			// Logger::Log(true, ConsoleColor::DARK_YELLOW, "Memory address: %llx size: %llx\n", address, static_cast<uint64_t>(allocSize));
 		}
 
 		return address;
@@ -567,7 +620,8 @@ public:
 			return 0;
 		}
 
-		Logger::Log(true, ConsoleColor::DARK_YELLOW, "Memory address: %llx size: %llx\n", alloc_addr, static_cast<uint64_t>(allocSize));
+		// NEW_MOD_TEST
+		// Logger::Log(true, ConsoleColor::DARK_YELLOW, "Memory address: %llx size: %llx\n", alloc_addr, static_cast<uint64_t>(allocSize));
 		bool success = false;
 		void* real_addr = _aligned_malloc(allocSize, 0x1000);
 		if (!real_addr) {

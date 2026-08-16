@@ -94,6 +94,7 @@ typedef enum _KERNEL_STACK_LIMITS {
     Win32kStackLimits,
     MaximumStackLimits
 } KERNEL_STACK_LIMITS, * PKERNEL_STACK_LIMITS;
+
 typedef struct _KERNEL_STACK_SEGMENT
 {
     ULONG StackBase;
@@ -102,8 +103,6 @@ typedef struct _KERNEL_STACK_SEGMENT
     ULONG InitialStack;
     ULONG ActualLimit;
 } KERNEL_STACK_SEGMENT, * PKERNEL_STACK_SEGMENT;
-
-
 
 typedef struct _KTRAP_FRAME
 {
@@ -1206,3 +1205,11 @@ typedef struct _PolicyInfo
     FILETIME notBeforeTime;
     FILETIME notAfterTime;
 } PolicyInfo, * pPolicyInfo;
+
+typedef enum _FILE_INFORMATION_CLASS {
+    FileDirectoryInformation = 1,
+    FileFullDirectoryInformation,
+    FileBothDirectoryInformation,
+    FileBasicInformation = 4,
+    FileStandardInformation = 5,
+} FILE_INFORMATION_CLASS;

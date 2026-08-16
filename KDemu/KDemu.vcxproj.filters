@@ -16,11 +16,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="LoadPE.cpp" />
-    <ClCompile Include="Emulate.cpp" />
     <ClCompile Include="KDemu.cpp" />
     <ClCompile Include="Global.cpp" />
     <ClCompile Include="unicorn.cpp" />
     <ClCompile Include="Debugger.cpp" />
+    <ClCompile Include="Emulate.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="NtType.hpp" />

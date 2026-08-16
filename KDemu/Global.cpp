@@ -195,7 +195,6 @@ void print_xmm_register(const char* reg, const uint8_t* value, int length) {
 	Logger::Log(false,ConsoleColor::DARK_GREEN, "\n");
 }
 
-
 void dump_stack(uc_engine* uc, uint64_t rsp, size_t num_entries) {
 	auto emu = Emu(uc);
 	std::vector<uint8_t> raw = emu->read(rsp, num_entries * sizeof(uint64_t));
@@ -208,7 +207,6 @@ void dump_stack(uc_engine* uc, uint64_t rsp, size_t num_entries) {
 }
 
 void ShowRegister(uc_engine* uc) {
-
 	const auto emu = Emu(uc);
 	std::array<std::array<uint8_t, 16>, 21> xmm_values{};
 	for (int i = 0; i <= 20; ++i) {
@@ -283,5 +281,3 @@ void ShowRegister(uc_engine* uc) {
 	printf("GDTR Base: 0x%llx, Limit: 0x%x  IDTR Base: 0x%llx, Limit: 0x%x\n", gdtr_base, gdtr_limit, idtr_base, idtr_limit);
 
 }
-
-

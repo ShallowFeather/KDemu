@@ -1,0 +1,12 @@
+﻿  Microsoft (R) C/C++ Optimizing Compiler Version 19.44.35213 for x64
+  Copyright (C) Microsoft Corporation.  著作權所有，並保留一切權利。
+  cl /c /IC:\Users\seant\Downloads\KDemu\KDemu\\include\LIEF /I"C:\Users\seant\Downloads\KDemu\vcpkg_installed\x64-windows\x64-windows\include" /W0 /WX- /diagnostics:column /sdl /Od /Oi /D NDEBUG /D _CONSOLE /D _UNICODE /D UNICODE /Gm- /MT /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /std:c++20 /permissive- /Fo"x64\Release\\" /Fd"x64\Release\vc143.pdb" /external:W0 /Gd /TP /FC /errorReport:none unicorn.cpp
+  unicorn.cpp
+  LIEF will disable #define enums. Please use LIEF_PE_XXXX or LIEF::PE::XXXX instead!
+C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\include\chrono(2359,9): warning C4530: 已使用 C++ 例外狀況處理常式，但沒有啟用回溯語意 (Unwind Semantics)。請指定 /EHsc
+  (編譯來源檔案 'unicorn.cpp')
+  
+  KDemu.vcxproj -> C:\Users\seant\Downloads\KDemu\x64\Release\KDemu.exe
+  C:\Users\seant\Downloads\KDemu\x64\Release\KDemu.exe: message: 部署相依性
+  C:\Users\seant\Downloads\KDemu\vcpkg_installed\x64-windows\x64-windows\bin\unicorn.dll -> C:\Users\seant\Downloads\KDemu\x64\Release\unicorn.dll 已跳過，為最新狀態
+  C:\Users\seant\Downloads\KDemu\x64\Release\unicorn.dll: message: 部署相依性
