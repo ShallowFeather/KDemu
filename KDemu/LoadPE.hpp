@@ -63,6 +63,9 @@ public:
 	std::map<std::string, uint64_t> AllDriverBaseAddr;
 	void GetAllDriverBaseAddresses();
 	void MapAllDriversFromKdmp();
+
+	bool ReadKdmpMem(uint64_t addr, void* out, size_t sz) const;
+
 	std::unordered_map<uint32_t, std::pair<uint64_t, std::string>> MSRList;
 
 	// MOD_TEST

@@ -637,8 +637,8 @@ public:
 		std::lock_guard<std::mutex> lock(mutex_);
 		hooks_[hh] = { hh, std::move(cb), begin, end, savedArgs };
 
-		std::printf("[+] Temporary code hook added: handle=%llu, range=[0x%llx, 0x%llx]\n",
-			(uint64_t)hh, begin, end);
+		/*std::printf("[+] Temporary code hook added: handle=%llu, range=[0x%llx, 0x%llx]\n",
+			(uint64_t)hh, begin, end);*/
 	}
 
 private:
@@ -653,7 +653,7 @@ private:
 					info.callback(uc, address, size, info.savedArgs);
 
 				uc_hook_del(uc, info.handle);
-				std::printf("[-] Code hook %llu removed (one-shot)\n", (uint64_t)info.handle);
+				// std::printf("[-] Code hook %llu removed (one-shot)\n", (uint64_t)info.handle);
 				it = self->hooks_.erase(it);
 				continue;
 			}

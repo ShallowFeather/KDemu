@@ -66,6 +66,15 @@ void Unicorn::register_hook(uc_engine* uc, uint64_t address, const byte size, vo
 		}
 	}
 
+	// base: Base=0xfffff805dc9a0000
+	// 0x1443EEEF0 
+	// 0xff0000000
+	// printf("executing 0x%llx\n", address);
+	if (address == 0xfffff805e07dd185) {
+		printf("RESTORING...\n");
+		emu->rip(0x143DED500 - 0x140000000 + 0xfffff805dc9a0000);
+	}
+
 	std::vector<uint8_t> code = emu->read(address, size);
 	if (size >= 1) {
 		if (match(code.data(), size, { 0xFA })) {
@@ -128,20 +137,20 @@ void Unicorn::register_hook(uc_engine* uc, uint64_t address, const byte size, vo
 		}
 		if (match(code.data(), size, { 0x0f, 0x32 })) {
 			uint64_t rcx = emu->rcx();
-			Logger::Log(true, 12, "RDMSR %llx\n", rcx);
-			Logger::Log(true, 10, "Addr: %llx\n", address);
+			Logger::Log(true, 12, "RDMSR %llx [ Addr: %llx ", rcx, address);
+			// Logger::Log(true, 10, "Addr: %llx\n", address);
 			if (!loader->MSRList[rcx].second.empty()) {
-
-				Logger::Log(true, 10, "%s\n", loader->MSRList[rcx].second.c_str());
+				Logger::Log(true, 10, "| %s | ", loader->MSRList[rcx].second.c_str());
 				auto value1 = loader->MSRList[rcx].first & 0xFFFFFFFF;
 				auto value2 = (loader->MSRList[rcx].first >> 32) & 0xFFFFFFFF;
 				emu->eax(static_cast<uint32_t>(value1));
 				emu->edx(static_cast<uint32_t>(value2));
 				uint64_t addr = address + 2;
 				emu->rip(addr);
-				Logger::Log(true, 12, "READ MSR: %llx\n", loader->MSRList[rcx].first);
+				Logger::Log(true, 12, "READ MSR: %llx ]\n", loader->MSRList[rcx].first);
 			}
 			else {
+				Logger::Log(true, 12, "]");
 				seh_Handle(uc);
 			}
 
@@ -203,12 +212,6 @@ void Unicorn::register_hook(uc_engine* uc, uint64_t address, const byte size, vo
 				uint32_t temp_value = emu->read<uint32_t>(temp);
 				if (temp_value != 0)
 				{
-					/*int o = 0;
-					do {
-						temp_value = emu->read<uint32_t>(temp);
-						if (temp_value == 0)
-							break;
-					} while (true);*/
 				}
 			}
 		}
@@ -434,7 +437,8 @@ bool Unicorn::hook_mem_invalid(uc_engine* uc, uc_mem_type type, uint64_t address
 			loader->real_mem_map_type_all.erase(aligned_address);
 			loader->real_mem_map_type_read.erase(aligned_address);
 
-			Logger::Log(true, ConsoleColor::YELLOW, "UC_MEM_WRITE_PROT memory AT %llx  msize : %llx\n", address, msize);
+			// NEW_MOD_TEST
+			// Logger::Log(true, ConsoleColor::YELLOW, "UC_MEM_WRITE_PROT memory AT %llx  msize : %llx\n", address, msize);
 		}
 
 		break;
@@ -481,10 +485,10 @@ bool Unicorn::hook_mem_invalid(uc_engine* uc, uc_mem_type type, uint64_t address
 
 			if (aligned_address <= address && address <= aligned_address + msize - 1)
 			{
-				Logger::Log(true, ConsoleColor::RED, "UC_MEM_READ_UNMAPPED Remap Region AT %llx, %llx size : %llx\n",
+				/*Logger::Log(true, ConsoleColor::RED, "UC_MEM_READ_UNMAPPED Remap Region AT %llx, %llx size : %llx\n",
 					aligned_address,
 					real_addr,
-					msize);
+					msize);*/
 				err = uc_mem_map_ptr(uc, aligned_address, msize, my_ucport, real_addr);
 				if (err != UC_ERR_OK) {
 					Logger::Log(true, ConsoleColor::YELLOW, "UC_MEM_READ_UNMAPPED failed at %llx err : %d\n", aligned_address, err);

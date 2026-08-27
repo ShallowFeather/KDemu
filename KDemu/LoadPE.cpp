@@ -8,8 +8,10 @@
 #include "cpu.h"
 
 #pragma comment(lib,"ntdll.lib")
-
 #pragma warning(disable : 4996)
+
+using namespace kdmpparser;
+
 extern "C"
 {
 	NTSYSAPI
@@ -21,6 +23,23 @@ extern "C"
 			USHORT Directory,
 			PULONG Size
 		);
+}
+
+bool PEloader::ReadKdmpMem(uint64_t addr, void* out, size_t sz) const {
+	uint8_t* dst = reinterpret_cast<uint8_t*>(out);
+	size_t rem = sz;
+	while (rem > 0) {
+		const uint8_t* page = kdmp.GetVirtualPage(addr); // KDMP will aligned the address themself
+		if (!page) return false;
+		size_t off = kdmpparser::Page::Offset(addr);
+		size_t avail = 0x1000ull - off;
+		size_t n = (rem < avail) ? rem : avail;
+		std::memcpy(dst, page + off, n);
+		dst += n;
+		addr += n;
+		rem -= n;
+	}
+	return true;
 }
 
 void PEloader::GetAllDriverBaseAddresses() {
@@ -35,6 +54,7 @@ void PEloader::GetAllDriverBaseAddresses() {
 		std::cerr << "EnumDeviceDrivers failed: " << GetLastError() << std::endl;
 		return;
 	}
+
 	for (void* baseAddr : driverAddresses) {
 		if (baseAddr == nullptr) break;
 
@@ -79,44 +99,6 @@ void PEloader::MapAllDriversFromKdmp() {
 		processed_names.emplace_back(basename_no_ext(pf->FileName));
 	}
 
-	/*int ntIndex = -1;
-	for (size_t i = 0; i < peFiles.size(); ++i) {
-		if (peFiles[i] && peFiles[i]->FileName == "ntoskrnl.exe") {
-			ntIndex = static_cast<int>(i);
-			break;
-		}
-	}
-	if (ntIndex < 0) {
-		Logger::Log(true, ConsoleColor::RED, "[KDMP] Failed to find ntoskrnl.exe PE metadata; unable to locate PsLoadedModuleList.\n");
-		return;
-	}
-
-	uint64_t ntCandidates[3] = { 0, 0, 0 };
-	int candCount = 0;
-	if (peFiles[ntIndex]->Base) ntCandidates[candCount++] = peFiles[ntIndex]->Base;
-	if (NtoskrnlBase) ntCandidates[candCount++] = NtoskrnlBase;
-	auto itLive = AllDriverBaseAddr.find("ntoskrnl.exe");
-	if (itLive != AllDriverBaseAddr.end()) ntCandidates[candCount++] = itLive->second;*/
-
-	auto read_kdmp = [this](uint64_t addr, void* out, size_t sz) -> bool {
-		uint8_t* dst = reinterpret_cast<uint8_t*>(out);
-		size_t rem = sz;
-		while (rem > 0) {
-			uint64_t page_base = addr & ~0xfffull;
-			const uint8_t* page = kdmp.GetVirtualPage(page_base);
-			if (!page) return false;
-			size_t off = static_cast<size_t>(addr & 0xfff);
-			size_t avail = 0x1000ull - off;
-			size_t n = (rem < avail) ? rem : avail;
-			const uint8_t* src = page + off;
-			for (size_t i = 0; i < n; ++i) dst[i] = src[i];
-			dst += n;
-			addr += n;
-			rem -= n;
-		}
-		return true;
-	};
-
 	constexpr size_t kMaxModules = 4096;
 	size_t mod_count = 0;
 
@@ -126,8 +108,8 @@ void PEloader::MapAllDriversFromKdmp() {
 		const std::string& name = Mod.ImageName;
 
 		if (imageBase && imageSize) {
-			const uint64_t alignedStart = imageBase & ~0xfffull;
-			const uint64_t alignedEnd = (imageBase + imageSize + 0xfff) & ~0xfffull;
+			const uint64_t alignedStart = Page::Align(imageBase);
+			const uint64_t alignedEnd = Page::Align(imageBase + imageSize + 0xfff);
 			const uint64_t alignedSize = alignedEnd - alignedStart;
 			std::string baseNameNoExt = basename_no_ext(name);
 			bool skip_by_name = false;
@@ -143,9 +125,7 @@ void PEloader::MapAllDriversFromKdmp() {
 			uint64_t imgEnd = imageBase + imageSize - 1;
 			for (auto* pf : peFiles) {
 				if (!pf) continue;
-				uint64_t peStart = pf->Base;
-				uint64_t peEnd = pf->End;
-				if (imgStart <= peEnd && imgEnd >= peStart) {
+				if (imgStart <= pf->End && imgEnd >= pf->Base) {
 					skip_by_range = true;
 					break;
 				}
@@ -159,7 +139,7 @@ void PEloader::MapAllDriversFromKdmp() {
 				continue;
 			}
 
-			void* host_buf = _aligned_malloc(static_cast<size_t>(alignedSize), 0x1000);
+			void* host_buf = _aligned_malloc(static_cast<size_t>(alignedSize), Page::Size);
 			if (!host_buf) {
 				Logger::Log(true, ConsoleColor::RED, "[KDMP] Buffer allocation failed: %s Base=0x%llx Size=0x%llx\n", name.c_str(), imageBase, imageSize);
 			}
@@ -168,12 +148,12 @@ void PEloader::MapAllDriversFromKdmp() {
 				for (uint64_t i = 0; i < alignedSize; ++i) p[i] = 0;
 
 				uint64_t filled = 0;
-				for (uint64_t addr = alignedStart; addr < alignedEnd; addr += 0x1000) {
+				for (uint64_t addr = alignedStart; addr < alignedEnd; addr += Page::Size) {
 					const uint8_t* page = kdmp.GetVirtualPage(addr);
 					if (!page) continue;
 					uint64_t off = addr - alignedStart;
-					for (size_t i = 0; i < 0x1000; ++i) p[off + i] = page[i];
-					filled += 0x1000;
+					for (size_t i = 0; i < Page::Size; ++i) p[off + i] = page[i];
+					filled += Page::Size;
 				}
 
 				bool already_mapped = false;
@@ -431,6 +411,7 @@ void PEloader::map_kuser_shared_data() {
 	Emu(uc)->write(KUSER_SHARED_DATA_ADDRESS + 0x2d4, &data, sizeof(data));
 	Logger::Log(true, ConsoleColor::DARK_GREEN, "KUSER_SHARED_DATA mapped and initialized at 0x%llx \n", KUSER_SHARED_DATA_ADDRESS);
 }
+
 void PEloader::InitProcessor() {
 	auto emu = Emu(uc);
 	SegmentSelector cs = { 0 };
@@ -460,18 +441,18 @@ void PEloader::InitProcessor() {
 	this->objectList.emplace_back(idtrObj);*/
 
 	emu->idtr(idtr, 0x0FFF);
-	emu->alloc(0x1000, idtr);
-	emu->write(idtr, kdmp.GetVirtualPage(idtr), 0x1000);
+	emu->alloc(Page::Size, idtr);
+	emu->write(idtr, kdmp.GetVirtualPage(idtr), Page::Size);
 	/* Init GS Segment */
 	uint64_t gsBase = GsBase;
-	gsBase = emu->alloc(0x1000, gsBase);
+	gsBase = emu->alloc(Page::Size, gsBase);
 	emu->gs_base(gsBase);
 	uint64_t CsBase = 0xfffff80508227900;
 
 	//
 	emu->cs(CsBase);
-	Object* gsObj = new Object("GS Segment", gsBase, 0x1000);
-	emu->write(gsBase, kdmp.GetVirtualPage(gsBase), 0x1000);
+	Object* gsObj = new Object("GS Segment", gsBase, Page::Size);
+	emu->write(gsBase, kdmp.GetVirtualPage(gsBase), Page::Size);
 
 	uint64_t kpcrBase;
 	uint64_t KPCRCBBase;
@@ -479,10 +460,10 @@ void PEloader::InitProcessor() {
 
 	kpcrBase = emu->read<uint64_t>(gsBase + 0x18);
 	kThreadBase = emu->read<uint64_t>(gsBase + 0x188);
-	emu->alloc(0x1000, kThreadBase & ~0xfff, MUC_PROT_ALL);
-	emu->write(kThreadBase & ~0xfff, kdmp.GetVirtualPage(kThreadBase & ~0xfff), 0x1000);
+	emu->alloc(0x1000, Page::Align(kThreadBase), MUC_PROT_ALL);
+	emu->write(Page::Align(kThreadBase), kdmp.GetVirtualPage(kThreadBase), Page::Size);
 
-	Object* kThreadObj = new Object("KThread", kThreadBase, 0x1000);
+	Object* kThreadObj = new Object("KThread", kThreadBase, Page::Size);
 	uint64_t currentApcState;
 	currentApcState = emu->read<uint64_t>(kThreadBase + 0x98);
 
@@ -527,6 +508,7 @@ void PEloader::InitProcessor() {
 	MSRList[0xc0000082] = { 0x10000, "MSR_LSTAR" };
 	MSRList[0x1B] = { 0xfee00800, "IA32_APIC_BASE" };
 }
+
 void PEloader::InsertTailList(
 	IN ULONG64 ListHeadAddress,
 	IN ULONG64 EntryAddress
@@ -537,13 +519,10 @@ void PEloader::InsertTailList(
 
 	Blink = emu->read<PLIST_ENTRY>(ListHeadAddress + offsetof(LIST_ENTRY, Blink));
 
-
 	emu->write(EntryAddress + offsetof(LIST_ENTRY, Flink), &ListHeadAddress, sizeof(ListHeadAddress));
-
 	emu->write(EntryAddress + offsetof(LIST_ENTRY, Blink), &Blink, sizeof(Blink));
 
 	emu->write((uint64_t)Blink + offsetof(LIST_ENTRY, Flink), &EntryAddress, sizeof(EntryAddress));
-
 	emu->write(ListHeadAddress + offsetof(LIST_ENTRY, Blink), &EntryAddress, sizeof(EntryAddress));
 }
 
@@ -591,7 +570,6 @@ void PEloader::Init() {
 	majorFunctionTable[IRP_MJ_PNP] = driverEntry + 5;
 	majorFunctionTable[IRP_MJ_INTERNAL_DEVICE_CONTROL] = driverEntry + 6;
 
-
 	uint64_t majorFunctionAddr = Emu(uc)->HeapAlloc(sizeof(majorFunctionTable));
 	Emu(uc)->write(majorFunctionAddr, &majorFunctionTable, sizeof(majorFunctionTable));
 
@@ -602,7 +580,7 @@ void PEloader::Init() {
 	Emu(uc)->write(_registry, registry, lstrlenW(registry) * sizeof(WCHAR));
 
 	const wchar_t* HardwareDatabase = L"\\REGISTRY\\MACHINE\\HARDWARE\\DESCRIPTION\\SYSTEM";
-	_PRIMITIVE_UNICODE_STRING hwDatabase;
+	_PRIMITIVE_UNICODE_STRING hwDatabase{};
 	hwDatabase.Buffer = (WCHAR*)HardwareDatabase;
 	hwDatabase.Length = lstrlenW(HardwareDatabase) * sizeof(WCHAR);
 	hwDatabase.MaximumLength = 0x5C;
@@ -790,8 +768,6 @@ void PEloader::LoadModule(const std::string path, int type) {
 
 	auto peSections = peBinary->sections();;
 	PEfile* pe = new PEfile_t();
-
-
 	uint64_t peHeaderSize = peBinary->optional_header().sizeof_headers();
 
 	std::ifstream file(path, std::ios::binary);
@@ -851,14 +827,16 @@ void PEloader::LoadModule(const std::string path, int type) {
 			uint64_t PsLoadedModuleList = this->PsLoadedModuleListBase;
 			Emu(uc)->write(this->PsLoadedModuleListBase, &PsLoadedModuleList, sizeof(PsLoadedModuleList));
 		}
-		int k = vsize / 0x1000;//(pe->End - pe->Base) / 0x1000;
+
+		int k = vsize / Page::Size;//(pe->End - pe->Base) / 0x1000;
 		for (int i = 0; i < k; i++) {
-			uint64_t check = pe->Base + i * 0x1000;
+			uint64_t check = pe->Base + i * Page::Size;
 			auto page = kdmp.GetVirtualPage(check);
 			if (page != NULL) {
-				Emu(uc)->write(check, kdmp.GetVirtualPage(check), 0x1000);
+				Emu(uc)->write(check, kdmp.GetVirtualPage(check), Page::Size);
 			}
 		}
+
 		if (path == "ntoskrnl.exe") {
 
 			bool KdDebuggerNotPresent = 1;
@@ -868,8 +846,6 @@ void PEloader::LoadModule(const std::string path, int type) {
 			Emu(uc)->write(KdDebuggerNotPresentaddress, &KdDebuggerNotPresent, sizeof(KdDebuggerNotPresent));
 			Emu(uc)->write(KdDebuggerEnabledaddress, &KdDebuggerEnabled, sizeof(KdDebuggerEnabled));
 		}
-
-
 	}
 	else {
 		return;
